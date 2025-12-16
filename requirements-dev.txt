@@ -1,0 +1,10 @@
+flask
+flask-cors
+pydantic
+fastapi
+uvicorn[standard]
+aiofiles
+python-multipart
+ultralytics
+waitress
+python-dotenv

@@ -1,0 +1,934 @@
+/* Global */
+body {
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow: auto;
+}
+
+/* Sidebar */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: var(--sidebar-width);
+    background: linear-gradient(180deg, var(--surface), #EDF2F7);
+    border-right: 1px solid var(--border);
+    padding: 18px;
+    box-sizing: border-box;
+    z-index: 1000;
+    transition: width .2s ease;
+    color: var(--text-primary);
+}
+
+.sidebar.collapsed {
+    width: var(--sidebar-collapsed-width);
+}
+
+/* Toggle button */
+.toggle-btn {
+    font-size: 20px;
+    cursor: pointer;
+    margin-bottom: 14px;
+    color: var(--muted);
+}
+
+/* Menu items */
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
+.menu-item i {
+    margin-right: 10px;
+    color: var(--color-accent);
+}
+
+.menu-item:hover,
+.menu-item.active {
+    background: rgba(74, 144, 226, 0.10);
+    box-shadow: 0 4px 12px var(--elevation);
+    border-left: 3px solid var(--color-primary);
+}
+
+.sidebar.collapsed .menu-item span {
+    display: none;
+}
+
+/* Main content */
+.main-content {
+    position: relative;
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+    padding: 10px 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    transition: margin-left .25s ease, margin-right .25s ease;
+    z-index: 1;
+    background: transparent;
+    color: var(--text-primary);
+}
+
+.card-section {
+    margin-bottom: 10px;
+    padding: 2px;
+    /* Aumenta o padding interno para organização */
+}
+
+/* --- Estilos para Comparação Lado a Lado --- */
+
+/* Contêiner principal para o grupo de comparação de UMA imagem */
+.image-comparison-group {
+    /* Manter estilos de card/seção */
+    padding: 16px;
+    /* 🛑 GARANTA QUE ESTA CLASSE TENHA BACKGROUND: var(--surface) SE NECESSÁRIO */
+    background: var(--surface);
+    border-radius: 8px;
+}
+
+/* Define o GRID FLEXÍVEL que alinha as predições de diferentes modelos lado a lado */
+.comparison-grid {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+    margin-top: 10px;
+    flex-wrap: nowrap;
+    /* mantém uma única linha, permite scroll horizontal */
+    overflow-x: auto;
+    /* ativa scroll horizontal quando há muitas colunas */
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+    /* espaço para o scrollbar em alguns browsers */
+}
+
+/* Cartão individual de predição (um modelo por coluna) */
+/* Cartão individual de predição (um modelo por coluna) */
+.comparison-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    /* Garante largura mínima e impede encolhimento para preservar tamanho das imagens */
+    flex: 0 0 320px;
+    /* não encolhe, largura fixa por cartão */
+    min-width: 320px;
+    box-sizing: border-box;
+}
+
+.comparison-card .model-name-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 5px;
+}
+
+/* Reutilizando estilos de imagem, mas corrigindo aspecto-ratio para ser mais quadrado (comum em classificação) */
+/* 🛑 AJUSTE PRINCIPAL AQUI: DIMINUINDO O TAMANHO DA IMAGEM */
+.comparison-card img {
+    display: block;
+    width: 100%;
+    max-height: 260px;
+    /* limita a altura para manter tamanho consistente */
+    height: auto;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #FFFFFF;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    cursor: pointer;
+}
+
+/* Adicione também um hover para o zoom no clique */
+.comparison-card img:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Remova ou substitua as regras antigas de .model-images se não for mais usá-las */
+/* Se houver conflito, remova .model-images e .model-result antigos. */
+
+.main-content.collapsed {
+    margin-left: var(--sidebar-collapsed-width);
+}
+
+/* Training images area: reserve space and reuse comparison grid styles */
+.training-images-area {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+.training-images-area .image-comparison-group {
+    margin-bottom: 12px;
+}
+
+/* ensure grid wraps nicely and reserves height */
+.training-images-area .comparison-grid {
+    gap: 12px;
+    align-items: flex-start;
+    overflow-x: auto;
+}
+
+
+
+/* Form elements */
+.form-group {
+    margin-bottom: 14px;
+}
+
+.form-group label {
+    display: inline-flex;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #FFFFFF;
+    color: var(--text-primary);
+    box-sizing: border-box;
+}
+
+/* Classe utilitária usada no HTML: inputs padrão */
+.input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #ffffff;
+    box-shadow: 0 4px 10px rgba(16, 24, 40, 0.04);
+    transition: box-shadow .12s ease, border-color .12s ease, transform .06s ease;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+/* Versão compacta para controles inline */
+.input-small {
+    padding: 6px 8px;
+    font-size: 13px;
+    border-radius: 8px;
+    width: auto;
+}
+
+/* Input específico para contagem por tipo (no painel de negativos) */
+.type-count-input {
+    border-left: 3px solid rgba(0, 0, 0, 0.04);
+    padding-left: 10px;
+    max-width: 140px;
+}
+
+/* Focus/hover visual cues */
+.input:focus,
+input[type="number"]:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 6px 20px rgba(74, 144, 226, 0.12);
+    transform: translateY(-1px);
+}
+
+/* Improve small inline labels + inputs alignment inside table cells */
+.table input[type="number"],
+.table .input-small {
+    min-width: 80px;
+}
+
+/* Slightly larger checkboxes/radio for touch friendliness */
+input[type="checkbox"],
+input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+/* When checkboxes/radios are inside labels used as inline controls, space them nicely */
+label input[type="checkbox"],
+label input[type="radio"] {
+    margin-right: 8px;
+}
+
+
+/* Fix: ensure inline checkbox+label groups align horizontally */
+.form-group .flex {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    /* avoid overflow on very small widths */
+}
+
+.form-group .flex input[type="checkbox"],
+.form-group .flex input[type="radio"] {
+    margin: 0;
+    vertical-align: middle;
+    width: 18px;
+    height: 18px;
+}
+
+.form-group .flex label {
+    margin: 0;
+    vertical-align: middle;
+    font-size: 14px;
+}
+
+/* ensure dynamically injected model labels align too */
+#models-container label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px;
+    border-radius: 6px;
+}
+
+/* Compact model item styling for prediction list */
+.model-item-compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    /* padding: 6px 8px; */
+    /* margin: 6px 6px 6px 0; */
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+    min-width: 160px;
+    max-width: 260px;
+}
+
+.model-item-compact .model-checkbox {
+    width: 16px;
+    height: 16px;
+}
+
+.model-item-compact.selected {
+    background: rgba(74, 144, 226, 0.08);
+    border-color: rgba(74, 144, 226, 0.18);
+    box-shadow: 0 6px 12px rgba(74, 144, 226, 0.06);
+}
+
+/* Make sure the container flex-wraps nicely */
+#models-container {
+    display: flex;
+    flex-wrap: wrap;
+    /* padding: 1px 0px; */
+    margin-top: 8px;
+    margin-right: 8px;
+    gap: 6px;
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    background: var(--color-primary);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform .06s ease, box-shadow .08s ease;
+    box-shadow: 0 6px 18px rgba(74, 144, 226, 0.12);
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(74, 144, 226, 0.14);
+}
+
+.btn:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Success / accent helpers */
+.btn-success {
+    background: var(--color-success);
+    color: #043028;
+}
+
+.icon-accent {
+    color: var(--color-accent);
+}
+
+
+
+/* Sua classe .card existente é mantida */
+.card {
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Novo Estilo Específico para o Resumo */
+.dataset-summary-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 0 0;
+}
+
+.dataset-summary-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-light);
+    /* Linha divisória suave */
+    display: flex;
+    justify-content: space-between;
+    /* Texto à esquerda, valor à direita */
+    align-items: center;
+    font-size: 14px;
+}
+
+/* Remove a borda do último item (limpeza visual) */
+.dataset-summary-list li:last-child {
+    border-bottom: none;
+}
+
+/* Estilos para os Ícones/Indicadores */
+.data-icon {
+    margin-right: 10px;
+    font-size: 16px;
+}
+
+/* Estilos de cor para os valores principais (mais proeminentes) */
+.total-positive {
+    color: #28a745;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.total-negative {
+    color: #dc3545;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+/* Estilo para a linha do Total Geral (Fundo de Destaque) */
+.dataset-summary-list .total-highlight {
+    background-color: var(--accent-light);
+    /* Cor de fundo para o total */
+    padding: 12px 15px;
+    margin: 10px -15px 10px -15px;
+    /* Expande para as bordas internas do card */
+    border-radius: 0;
+    font-size: 16px;
+    font-weight: bold;
+    border-bottom: none;
+}
+
+/* Estilo para a Seção de Divisão (Split) - Borda Dupla */
+.dataset-summary-list .split-section {
+    border-top: 2px dashed var(--border);
+    /* Linha tracejada forte para separação */
+    padding-top: 15px;
+    margin-top: 15px;
+}
+
+
+
+.chart-placeholder {
+    height: 300px;
+    background: linear-gradient(180deg, rgba(234, 236, 241, 0.6), rgba(255, 255, 255, 0.4));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+.grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+}
+
+.table th,
+.table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    color: var(--text-primary);
+}
+
+.table th {
+    background: transparent;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+/* Small refinements */
+textarea#logs {
+    width: 100%;
+    min-height: 140px;
+    padding: 10px;
+    border-radius: 8px;
+    background: #FFFFFF;
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+/* Utility: error messages */
+.alert-error {
+    background: rgba(255, 107, 107, 0.06);
+    border: 1px solid rgba(255, 107, 107, 0.18);
+    color: var(--danger);
+    padding: 8px;
+    border-radius: 6px;
+}
+
+/* utility */
+.hidden {
+    display: none !important;
+}
+
+/* spacing for folder input */
+#prediction-folder-input input {
+    margin-top: 6px;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #FFFFFF;
+    color: var(--text-primary);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Summary card uses surface + text */
+#selected-summary {
+    padding: 10px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-size: 13px;
+}
+
+/* Prediction results: stack models vertically and style each model as a card */
+.prediction-results {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-top: 8px;
+}
+
+/* Model card: usar 100% para garantir empilhamento vertical consistente */
+.model-result {
+    width: 100%;
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 6px 18px rgba(20, 30, 40, 0.04);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    box-sizing: border-box;
+}
+
+/* Model images: garantir um grid 2xN responsivo */
+.model-images {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    gap: 12px;
+    align-items: start;
+}
+
+/* garantir que as cards de imagem preenchem a célula */
+/* Card de imagem */
+.model-images .card {
+    width: 100%;
+    overflow: hidden;
+    border-radius: 8px;
+    padding: 6px;
+    /* opcional, remove se quiser imagem maior */
+    box-sizing: border-box;
+    background: var(--surface);
+}
+
+
+/* imagens maiores e responsivas */
+.model-images .card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/9;
+    /* mantém proporção agradável */
+    object-fit: cover;
+    border-radius: 6px;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    cursor: pointer;
+    min-height: 180px;
+    /* garante miniatura com boa altura */
+}
+
+
+/* Hover */
+.model-images .card img:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Mobile: cair para 1 coluna em telas pequenas */
+/* Em telas pequenas, 1 coluna */
+@media (max-width: 640px) {
+    .model-images {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Tweak spacing of the summary area */
+#selected-summary {
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+/* Responsivity */
+@media (max-width: 900px) {
+
+
+
+    .main-content {
+        margin-right: 0;
+    }
+
+
+}
+
+@media (max-width: 600px) {
+    .sidebar {
+        width: var(--sidebar-collapsed-width);
+    }
+
+    .main-content {
+        margin-left: var(--sidebar-collapsed-width);
+        margin-right: 0;
+    }
+
+    .comparison-grid {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        /* Ainda menores em mobile */
+    }
+
+    .comparison-card img {
+        max-height: 120px;
+        /* Reduz ainda mais a altura em telas pequenas */
+    }
+}
+
+/* Image modal styles */
+.img-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.img-modal:not(.hidden) {
+    pointer-events: auto;
+}
+
+.img-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    transition: opacity .18s ease;
+}
+
+.img-modal-content {
+    position: relative;
+    z-index: 10000;
+    max-width: 92%;
+    max-height: 92%;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    padding: 12px;
+    box-sizing: border-box;
+}
+
+.img-modal img {
+    max-width: 100%;
+    max-height: 80vh;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    display: block;
+    object-fit: contain;
+}
+
+/* viewport that contains the image and nav buttons; nav buttons are positioned relative to this box */
+.img-modal-viewport {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.img-modal-caption {
+    margin-top: 8px;
+    color: #fff;
+    text-align: center;
+    font-size: 13px;
+}
+
+.img-modal-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    z-index: 10002;
+    font-size: 18px;
+}
+
+.img-modal-prev {
+    left: calc(20% * -1 - 56px);
+    /* position outside the image viewport when wide */
+}
+
+.img-modal-next {
+    right: calc(20% * -1 - 56px);
+}
+
+/* Simpler fallback: place outside using negative offsets relative to the viewport width.
+   On many layouts this places the buttons outside the image area while keeping them vertically centered. */
+@media (max-width: 960px) {
+    .img-modal-prev {
+        left: -40px;
+    }
+
+    .img-modal-next {
+        right: -40px;
+    }
+}
+
+/* Mobile: keep buttons inside the viewport near image edges */
+@media (max-width: 640px) {
+    .img-modal-prev {
+        left: 12px;
+    }
+
+    .img-modal-next {
+        right: 12px;
+    }
+}
+
+/* cleaned duplicate rules */
+
+.img-modal.hidden {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .img-modal img {
+        max-height: 65vh;
+    }
+
+    .img-modal-content {
+        padding: 8px;
+    }
+}
+
+/* Config panel styles */
+.config-card {
+    background: linear-gradient(180deg, #ffffff, #fbfdff);
+    border: 1px solid rgba(0, 0, 0, 0.04);
+    padding: 12px;
+    border-radius: 10px;
+}
+
+.config-preview {
+    background: #0f1724;
+    color: #e6f2ff;
+    padding: 12px;
+    border-radius: 8px;
+    max-height: 280px;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+    font-size: 13px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.config-editor {
+    margin-top: 10px;
+}
+
+.config-textarea {
+    width: 100%;
+    min-height: 240px;
+    max-height: 60vh;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+    font-size: 13px;
+    box-sizing: border-box;
+    resize: vertical;
+}
+
+/* small button tweaks for config actions */
+#edit-config-btn,
+#save-config-btn,
+#cancel-config-btn,
+#reset-config-btn {
+    font-size: 13px;
+    padding: 6px 10px;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Novo CSS para a área de controle de negativos */
+.line-detail-row td {
+    border: none !important;
+}
+
+.line-detail-grid {
+    display: grid;
+    /* 3 colunas em desktop, caindo para menos em telas menores */
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    padding: 15px;
+    /* Manter o padding */
+    background: #fcfcfc;
+    /* Fundo muito claro para destacar os itens */
+    border-radius: 6px;
+    border: 1px solid var(--border-light);
+    /* Borda mais suave que a tracejada */
+}
+
+.line-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* Espaço entre o Label e o Input/Checkbox */
+
+    /* Faz o item parecer um pequeno cartão dentro do painel */
+    background: #FFFFFF;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.1s ease;
+}
+
+.line-item:hover {
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+.line-item label {
+    font-weight: 700;
+    /* Mais destaque para o nome */
+    font-size: 14px;
+    margin-bottom: 0;
+    /* Ajusta o espaçamento interno do item */
+}
+
+.line-item>div {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    /* Novo: Garante que o input fique à direita */
+}
+
+.line-item .line-count {
+    /* O input number deve ocupar a maior parte do espaço restante */
+    max-width: 80px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.line-item .line-enabled {
+    /* Checkbox à esquerda, para ligar/desligar a linha */
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.input-small {
+    padding: 6px 8px !important;
+    font-size: 14px;
+}
+
+/* Esconder a célula extra na linha principal quando os detalhes estão ocultos */
+.line-detail-row.hidden {
+    display: none;
+}
+
+/* Estilo para botões pequenos */
+.btn-sm {
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+/* Tabela de seleção de negativos (apenas para referência) */
+#negative-selection-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#negative-selection-table th,
+#negative-selection-table td {
+    padding: 10px 5px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+
+#negative-selection-table thead th {
+    font-size: 14px;
+    color: var(--color-primary);
+}

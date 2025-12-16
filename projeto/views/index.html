@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Plataforma YOLO Classificação</title>
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="sidebar" id="sidebar" aria-expanded="true">
+        <div class="toggle-btn" onclick="toggleSidebar()">☰</div>
+
+        <div class="menu-item active" data-page="treinamento" onclick="navigate('treinamento')">
+            <i class="fas fa-brain"></i><span>Treinamento</span>
+        </div>
+
+        <div class="menu-item" data-page="predicao" onclick="navigate('predicao')">
+            <i class="fas fa-search"></i><span>Predição</span>
+        </div>
+
+    </div>
+
+    <main class="main-content" id="main-content">
+        <div id="view" aria-live="polite">
+        </div>
+    </main>
+
+    <div id="img-modal" class="img-modal hidden" role="dialog" aria-hidden="true" aria-modal="true">
+        <div id="img-modal-backdrop" class="img-modal-backdrop" tabindex="-1"></div>
+        <div class="img-modal-content" role="document" aria-live="polite">
+            <button id="img-modal-close" class="img-modal-close" aria-label="Fechar imagem">✖</button>
+            <!-- caption placed above the image -->
+            <div id="img-modal-caption" class="img-modal-caption" aria-hidden="true"></div>
+
+            <!-- viewport groups image and nav buttons so buttons align with the image center -->
+            <div class="img-modal-viewport">
+                <button id="img-modal-prev" class="img-modal-nav img-modal-prev" aria-label="Imagem anterior">◀</button>
+                <img id="img-modal-img" src="" alt="" />
+                <button id="img-modal-next" class="img-modal-nav img-modal-next" aria-label="Próxima imagem">▶</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/api.js"></script>
+    <script src="./js/finder.js"></script>
+    <script src="./js/ui.js"></script>
+    <script src="./js/training_control.js"></script>
+
+    <script>
+        // init UI after modules loaded
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.UI && typeof window.UI.init === 'function') window.UI.init();
+        });
+    </script>
+</body>
+
+</html>

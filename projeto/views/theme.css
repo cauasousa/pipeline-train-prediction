@@ -1,0 +1,29 @@
+:root {
+    /* 🎨 Paleta "Neutro Tech" */
+    --color-primary: #4A90E2;
+    /* Azul suave (botões principais) */
+    --color-success: #7ED6A6;
+    /* Verde menta (feedback positivo) */
+    --color-accent: #A29BFE;
+    /* Lilás pastel (ícones / detalhes) */
+    --bg: #F8F9FB;
+    /* Fundo da página (muito claro) */
+    --surface: #E9ECF1;
+    /* Cards / superfícies (cinza claro) */
+    --text-primary: #2D3436;
+    /* Texto principal (cinza escuro) */
+    --text-muted: #636E72;
+    /* Texto secundário (cinza médio) */
+    --border: #DCDDE1;
+    /* Bordas e divisores (cinza sutil) */
+    --danger: #FF6B6B;
+    /* Erro (vermelho suave) */
+
+    /* layout sizes (can be tweaked) */
+    --sidebar-width: 250px;
+    --sidebar-collapsed-width: 60px;
+    --rightpanel-width: 320px;
+
+    /* elevation */
+    --elevation: rgba(45, 52, 54, 0.06);
+}
