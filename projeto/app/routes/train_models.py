@@ -56,8 +56,15 @@ def function_test_yolo(model_paths=None, dataset_path=None, split="val", project
     if ultralytics_available:
         for mp in model_paths:
             m = YOLO(mp)
-            r = m.val(data=dataset_path, split=split, project=project_name, name=os.path.basename(mp), save_dir=output_dir)
-            results[os.path.basename(mp)] = r
+            model_basename = os.path.basename(mp)
+            # Se output_dir for fornecido, usar como project; caso contrário, usar project_name
+            if output_dir:
+                # YOLO cria: output_dir/runs/classify/model_basename/
+                # Nós queremos: output_dir/model_basename/
+                r = m.val(data=dataset_path, split=split, project=str(output_dir), name=model_basename, save=True)
+            else:
+                r = m.val(data=dataset_path, split=split, project=project_name, name=model_basename, save=True)
+            results[model_basename] = r
     else:
         for mp in model_paths:
             name = os.path.basename(mp)

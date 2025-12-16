@@ -1,121 +1,7 @@
 (function (global) {
-    // Definindo as constantes no escopo principal do módulo
-    const PAGES = {
-        treinamento: 'treinamento.html',
-        predicao: 'predicao.html',
-    };
-
-    const cache = {};
-
-    const DEFAULT_CONFIG_KEY = 'yolo_default_config';
-    const DEFAULT_CONFIG_VERSION = 1;
-    const defaultConfig = {
-        // --- Configurações Principais de Treinamento ---
-        model: "yolo11x-cls.pt",           // Argumento de Treinamento: Modelo base
-        task: "classify",                   // Argumento de Treinamento: Modo (train/val)
-        mode: "train",                      // Argumento de Treinamento: Modo (train/val)
-        epochs: 50,                          // Argumento de Treinamento: Número de épocas
-        patience: 100,                       // Argumento de Treinamento: Paciência para Early Stopping
-        batch: 16,                           // Argumento de Treinamento: Tamanho do lote
-        imgsz: 224,                          // Argumento de Treinamento: Tamanho da imagem
-        save: true,                          // Argumento de Treinamento: Salvar checkpoints
-        save_period: -1,                     // Argumento de Treinamento: Frequência de salvamento de checkpoint
-        cache: false,                        // Argumento de Treinamento: Cache de imagens
-        device: 0,                       // Argumento de Treinamento: Dispositivo (GPU)
-        workers: 8,                          // Argumento de Treinamento: Threads de carregamento de dados
-
-        project: "/content/drive/MyDrive/pipeline/yolo_classificacao_resultados", // Argumento de Treinamento: Diretório do projeto
-        name: "treinamento_classificacao",   // Argumento de Treinamento: Nome da execução
-        exist_ok: false,                     // Argumento de Treinamento: Permitir sobrescrita
-        pretrained: true,                    // Argumento de Treinamento: Usar pesos pré-treinados
-        optimizer: "auto",                   // Argumento de Treinamento: Otimizador
-        seed: 0,                             // Argumento de Treinamento: Seed aleatória
-        deterministic: true,                 // Argumento de Treinamento: Determinismo
-        single_cls: false,                   // Argumento de Treinamento: Single class (Útil para classificação binária)
-        classes: null,                       // Argumento de Treinamento: Classes a incluir
-        rect: false,                         // Argumento de Treinamento: Treinamento retangular
-        multi_scale: false,                  // Argumento de Treinamento: Multi-escala
-        cos_lr: false,                       // Argumento de Treinamento: Learning Rate de Cosseno
-        close_mosaic: 10,                    // Argumento de Treinamento: Desativar mosaic nas últimas épocas
-        resume: false,                       // Argumento de Treinamento: Retomar treinamento
-        amp: true,                           // Argumento de Treinamento: Mixed Precision
-        fraction: 1.0,                       // Argumento de Treinamento: Fração do dataset
-        profile: false,                      // Argumento de Treinamento: Profiling
-        freeze: null,                        // Argumento de Treinamento: Congelar camadas
-        val: true,                           // Argumento de Treinamento: Ativar validação
-        plots: true,                         // Argumento de Treinamento: Gerar gráficos
-        compile: false,                      // Argumento de Treinamento: Compilação PyTorch 2.x
-        verbose: true,                       // Argumento de Treinamento: Verbose/Detalhamento
-
-        // --- Configurações de Hiperparâmetros (HPs) ---
-        lr0: 0.01,                           // HP: Taxa de aprendizado inicial
-        lrf: 0.01,                           // HP: Taxa de aprendizado final
-        momentum: 0.937,                     // HP: Momentum
-        weight_decay: 0.0005,                // HP: Decaimento de peso
-        warmup_epochs: 3.0,                  // HP: Épocas de aquecimento
-        warmup_momentum: 0.8,                // HP: Momentum de aquecimento
-        warmup_bias_lr: 0.1,                 // HP: LR de bias de aquecimento
-        box: 7.5,                            // HP: Peso da perda de caixa (relevante para detecção/segmentação)
-        cls: 0.5,                            // HP: Peso da perda de classificação
-        dfl: 1.5,                            // HP: Peso da perda DFL
-        pose: 12.0,                          // HP: Peso da perda de pose (relevante para estimativa de pose)
-        kobj: 1.0,                           // HP: Peso da perda de keypoint (relevante para estimativa de pose)
-        nbs: 64,                             // HP: Tamanho nominal do lote
-        overlap_mask: true,                  // HP: Máscara de sobreposição (relevante para segmentação)
-        mask_ratio: 4,                       // HP: Taxa de subamostragem (relevante para segmentação)
-        dropout: 0.0,                        // HP: Taxa de dropout (relevante para classificação)
-
-        // --- Configurações de Aumento de Dados ---
-        hsv_h: 0.015,                        // Aumento: Tonalidade
-        hsv_s: 0.7,                          // Aumento: Saturação
-        hsv_v: 0.4,                          // Aumento: Brilho/Valor
-        degrees: 0.0,                        // Aumento: Rotação
-        translate: 0.1,                      // Aumento: Translação
-        scale: 0.5,                          // Aumento: Escala
-        shear: 0.0,                          // Aumento: Cisalhamento
-        perspective: 0.0,                    // Aumento: Perspectiva
-        flipud: 0.0,                         // Aumento: Inversão vertical
-        fliplr: 0.5,                         // Aumento: Inversão horizontal
-        bgr: 0.0,                            // Aumento: Inversão BGR
-        mosaic: 1.0,                         // Aumento: Mosaic
-        mixup: 0.0,                          // Aumento: MixUp
-        cutmix: 0.0,                         // Aumento: CutMix
-        copy_paste: 0.0,                     // Aumento: Copy-Paste (relevante para segmentação)
-        copy_paste_mode: "flip",             // Aumento: Modo Copy-Paste
-        auto_augment: "randaugment",         // Aumento: Auto Augment
-        erasing: 0.4,                        // Aumento: Erasing
-        augment: false,                      // Aumento: Ativar aumento (geralmente ligado pelo mosaic, mas bom ter)
-
-        // --- Outros Argumentos de Treinamento ---
-        cfg: null,
-        iou: 0.7,
-        conf: null,
-        agnostic_nms: false,
-        max_det: 300,
-        retina_masks: false,
-        keras: false,
-        int8: false,
-        half: false,
-        dnn: false,
-        dynamic: false,
-        line_width: null,
-        embed: null,
-        show_boxes: true,
-        show_conf: true,
-        show_labels: true,
-        vid_stride: 1,
-        visualize: false,
-
-        // Argumentos não documentados para 'train' mas existentes em outras chamadas ou padrões
-        save_conf: false,
-        save_crop: false,
-        save_frames: false,
-        save_json: false,
-        save_txt: false,
-        time: null,
-        workspace: null
-    };
-    defaultConfig.config_version = DEFAULT_CONFIG_VERSION;
+    // Usa módulos existentes ao invés de duplicar
+    const ConfigManager = global.ConfigManager;
+    const Navigation = global.Navigation;
 
     // Mapeamento de Linhas por Tipo de Implante (vindo do backend)
     // valor inicial (será substituído por `loadNegativeLineCounts()` durante a inicialização)
@@ -162,11 +48,6 @@
         return Number(globalDefault?.value || 0);
     }
 
-    function toggleSidebar() {
-        document.getElementById('sidebar')?.classList.toggle('collapsed');
-        document.getElementById('main-content')?.classList.toggle('collapsed');
-    }
-
     function showLog(msg) {
         const area = document.getElementById('logs');
         const t = new Date().toLocaleTimeString();
@@ -193,98 +74,6 @@
         }
         summaryEl.innerHTML = parts.map(p => `<div style="margin-bottom:6px">${p}</div>`).join('');
         if ((selectedModels && selectedModels.length > 0) || source) summaryEl.classList.remove('hidden'); else summaryEl.classList.add('hidden');
-    }
-
-    // --- FUNÇÕES DE CONFIGURAÇÃO ---
-
-    function loadConfig() {
-        try {
-            let raw = null;
-            try { raw = localStorage.getItem(DEFAULT_CONFIG_KEY); } catch (e) { raw = null; }
-            if (!raw) {
-                try { raw = sessionStorage.getItem(DEFAULT_CONFIG_KEY); } catch (e) { raw = null; }
-            }
-            if (raw) {
-                try {
-                    const parsed = JSON.parse(raw);
-                    const storedVer = Number(parsed?.config_version || 0);
-                    // Retorna a config se for a versão mais recente ou mais nova
-                    if (storedVer >= DEFAULT_CONFIG_VERSION) return parsed;
-                    // stored version is older -> replace with new default
-                    const base = JSON.parse(JSON.stringify(defaultConfig));
-                    try { localStorage.setItem(DEFAULT_CONFIG_KEY, JSON.stringify(base)); } catch (e2) { try { sessionStorage.setItem(DEFAULT_CONFIG_KEY, JSON.stringify(base)); } catch (e3) { /* ignore save errors */ } }
-                    showLog('Configuração local desatualizada; atualizando para o novo padrão.');
-                    return base;
-                } catch (e) {
-                    // malformed JSON -> fallthrough to return default
-                }
-            }
-        } catch (e) { /* ignore access errors */ }
-        return JSON.parse(JSON.stringify(defaultConfig));
-    }
-
-    function saveConfig(obj) {
-        try {
-            if (!obj || typeof obj !== 'object') obj = {};
-            obj.config_version = DEFAULT_CONFIG_VERSION;
-            // Tenta salvar no localStorage (persistente)
-            localStorage.setItem(DEFAULT_CONFIG_KEY, JSON.stringify(obj));
-            // Tenta remover do sessionStorage (limpa qualquer fallback anterior)
-            try { sessionStorage.removeItem(DEFAULT_CONFIG_KEY); } catch (e) { /* ignore */ }
-            return true;
-        } catch (e) {
-            // Se o localStorage falhar (ex: quota cheia), cai para o sessionStorage
-            try {
-                sessionStorage.setItem(DEFAULT_CONFIG_KEY, JSON.stringify(obj));
-                showLog('Aviso: localStorage indisponível. Configuração salva na sessão (sessionStorage).');
-                return true;
-            } catch (e2) {
-                // Se tudo falhar, retorna false
-                console.error("Falha total ao salvar configuração.", e2);
-                return false;
-            }
-        }
-    }
-
-    function renderConfigPreview(cfg) {
-        const pre = document.getElementById('config-preview');
-        if (!pre) return;
-        pre.textContent = JSON.stringify(cfg, null, 2);
-    }
-
-    // --- FUNÇÕES DE NAVEGAÇÃO E CARREGAMENTO DE PÁGINA ---
-
-    function navigate(page) {
-        document.querySelectorAll('.menu-item').forEach(mi => mi.classList.remove('active'));
-        const active = document.querySelector(`.menu-item[data-page="${page}"]`);
-        if (active) active.classList.add('active');
-        loadPage(page);
-    }
-
-    async function loadPage(page) {
-        const view = document.getElementById('view');
-        const tpl = PAGES[page];
-        if (!tpl) { if (view) view.innerHTML = '<p>Página não encontrada.</p>'; return; }
-        if (cache[tpl]) { if (view) view.innerHTML = cache[tpl]; bindPageHandlers(page); return; }
-        try {
-            const url = new URL(tpl, window.location.origin + '/').href;
-            console.debug('[UI] fetching view', url);
-            const res = await fetch(url, { cache: 'no-store' });
-            if (!res.ok) {
-                const body = await res.text().catch(() => '');
-                const msg = `Falha ao carregar '${tpl}': status=${res.status} ${res.statusText}` + (body ? `\n${body}` : '');
-                console.error(msg);
-                if (view) view.innerHTML = `<div class="card"><p>${msg.replace(/</g, '&lt;')}</p></div>`;
-                return;
-            }
-            const html = await res.text();
-            cache[tpl] = html;
-            if (view) view.innerHTML = html;
-            bindPageHandlers(page);
-        } catch (e) {
-            console.error('[UI] erro carregando template', tpl, e);
-            if (view) view.innerHTML = `<div class="card"><p>Erro carregando página (${tpl}): ${String(e).replace(/</g, '&lt;')}</p></div>`;
-        }
     }
 
     // --- FUNÇÕES DE DADOS NEGATIVOS/RESUMO (TREINAMENTO) ---
@@ -680,7 +469,7 @@
         const preprocessingTypes = Array.from(document.querySelectorAll('#tipo-checkboxes-preprocessing input[type="checkbox"]:checked')).map(i => i.value);
 
         // 2. Leitura da Configuração de Treino (Full Config)
-        let fullConfig = loadConfig(); // Começa com o valor salvo
+        let fullConfig = ConfigManager.loadConfig(); // Começa com o valor salvo
         const inlineTa = document.getElementById('config-json-inline');
         // Se o editor inline estiver aberto, prioriza o seu valor (mesmo que não salvo)
         if (inlineTa && inlineTa.parentNode) {
@@ -715,14 +504,19 @@
         let selected = [];
         try {
             const checked = Array.from(document.querySelectorAll('.model-checkbox')).filter(cb => cb.checked).map(cb => cb.value);
+            console.log('[DEBUG] Checkboxes encontrados:', checked);
             if (checked && checked.length > 0) {
                 selected = checked;
             } else {
                 selected = JSON.parse(localStorage.getItem('selected_models') || '[]') || [];
+                console.log('[DEBUG] Usando localStorage:', selected);
             }
         } catch (e) {
+            console.error('[DEBUG] Erro ao ler checkboxes:', e);
             try { selected = JSON.parse(localStorage.getItem('selected_models') || '[]') || []; } catch (e2) { selected = []; }
         }
+
+        console.log('[DEBUG] Modelos selecionados finais:', selected, 'tipo:', typeof selected, 'length:', selected?.length);
 
         if (!selected || selected.length === 0) {
             alert('Nenhum modelo selecionado. Selecione pelo menos um modelo antes de executar a predição.');
@@ -744,8 +538,10 @@
         }
 
         showLog(`Enviando predição para: ${selected.join(', ')}`);
-        const payload = { models: selected, source, preprocessors: [], options: {} };
+        const payload = { models: selected, options: {} };
         if (folderPath) payload.options.path = folderPath;
+
+        console.log('[DEBUG] Payload enviado:', JSON.stringify(payload, null, 2));
 
         const runBtn = document.getElementById('run-prediction-btn');
         if (runBtn) { runBtn.disabled = true; runBtn.textContent = '⏳ Executando...'; }
@@ -765,8 +561,9 @@
         if (!container) return;
         container.innerHTML = '';
 
+        const imagesToCompare = {}; // Declarar FORA do try-catch para evitar erro de escopo
         try {
-            const imagesToCompare = {}; // Chave: nome_do_arquivo.ext
+            // Chave: nome_do_arquivo.ext
 
             for (const model of selected) {
                 let modelImages = [];
@@ -962,8 +759,8 @@
     function bindPageHandlers(page) {
         if (page === 'treinamento') {
             // --- Configuração YOLO ---
-            const currentCfg = loadConfig();
-            renderConfigPreview(currentCfg);
+            const currentCfg = ConfigManager.loadConfig();
+            ConfigManager.renderConfigPreview(currentCfg);
 
             // ... (Lógica do editBtn/saveInline/cancelInline omitida para brevidade, mas deve ser mantida) ...
             const editBtn = document.getElementById('edit-config-btn');
@@ -994,12 +791,12 @@
                     const parsed = JSON.parse(txt);
                     if (typeof parsed !== 'object' || parsed === null) throw new Error('Config must be a JSON object');
                     // Salva (com fallback para sessionStorage)
-                    const ok = saveConfig(parsed);
+                    const ok = ConfigManager.saveConfig(parsed);
                     if (!ok) throw new Error('Falha ao salvar a configuração no armazenamento persistente.');
 
                     // persist in-memory and update preview
                     Object.assign(currentCfg, parsed);
-                    renderConfigPreview(currentCfg);
+                    ConfigManager.renderConfigPreview(currentCfg);
                     showLog('Configuração atualizada e salva localmente.');
                     cleanupInlineEditor();
                 } catch (e) {
@@ -1045,10 +842,10 @@
 
             // Lógica para o botão 'Restaurar'
             resetBtn?.addEventListener('click', () => {
-                const base = JSON.parse(JSON.stringify(defaultConfig));
-                saveConfig(base);
+                const base = ConfigManager.getDefaults();
+                ConfigManager.saveConfig(base);
                 Object.assign(currentCfg, base); // Atualiza a referência in-memory
-                renderConfigPreview(base);
+                ConfigManager.renderConfigPreview(base);
                 showLog('Configuração restaurada para o padrão.');
                 cleanupInlineEditor(); // Limpa se o editor inline estiver aberto
             });
@@ -1059,8 +856,29 @@
                 if (!sel) return;
                 sel.innerHTML = '<option>Carregando...</option>';
                 try {
-                    // Simula dados (substitua por window.API.getDatasets() real)
-                    const datasets = window.API?.getDatasets ? await window.API.getDatasets() : ['dataset_upload_01', 'dataset_upload_02', 'dataset_base_yolo'];
+                    // Carrega via API e loga base/resultado para depuração
+                    console.debug('[UI] API_BASE =', window.API?.API_BASE);
+                    let datasets = window.API?.getDatasets ? await window.API.getDatasets() : [];
+                    // Fallback: tenta portas comuns se nada veio
+                    if (!datasets || datasets.length === 0) {
+                        const tries = [
+                            `${window.location.origin}/train/datasets`,
+                            'http://localhost:8000/train/datasets',
+                            'http://localhost:5000/train/datasets'
+                        ];
+                        for (const url of tries) {
+                            try {
+                                const resp = await fetch(url);
+                                if (!resp.ok) continue;
+                                const data = await resp.json();
+                                if (Array.isArray(data.datasets) && data.datasets.length) {
+                                    datasets = data.datasets;
+                                    break;
+                                }
+                            } catch (e) { /* ignore and try next */ }
+                        }
+                    }
+                    console.debug('[UI] datasets carregados =', datasets);
                     if (!datasets || datasets.length === 0) {
                         sel.innerHTML = '<option value="">Nenhum dataset encontrado</option>';
                         return;
@@ -1269,33 +1087,34 @@
                 document.getElementById('default-rand-count')?.addEventListener('input', updateNegativeSummary);
 
                 // 3. Listeners para o split (se houver) — aplicando enforcement para que a soma seja no máximo 100%
-                // Positivos
-                ['train-percent', 'val-percent', 'test-percent'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (!el) return;
-                    el.addEventListener('input', (e) => {
-                        enforceSplitSum(['train-percent', 'val-percent', 'test-percent'], e.target);
-                        updateNegativeSummary();
-                    });
-                });
-
-                // Negativos (random split)
-                ['rand-train-percent', 'rand-val-percent', 'rand-test-percent'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if (!el) return;
-                    el.addEventListener('input', (e) => {
-                        enforceSplitSum(['rand-train-percent', 'rand-val-percent', 'rand-test-percent'], e.target);
-                        updateNegativeSummary();
-                    });
-                });
-
-                // 4. MOCK DATA: Simula o total de positivos
-                const positiveCountEl = document.getElementById('total-positive-count');
-                if (positiveCountEl && positiveCountEl.textContent === '0') positiveCountEl.textContent = '1000';
-
-                // 5. Listeners para a divisão de treino/val/teste positiva
-                // (Já conectados acima com enforcement de soma <= 100%)
             }
+            // Positivos
+            ['train-percent', 'val-percent', 'test-percent'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('input', (e) => {
+                    enforceSplitSum(['train-percent', 'val-percent', 'test-percent'], e.target);
+                    updateNegativeSummary();
+                });
+            });
+
+            // Negativos (random split)
+            ['rand-train-percent', 'rand-val-percent', 'rand-test-percent'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('input', (e) => {
+                    enforceSplitSum(['rand-train-percent', 'rand-val-percent', 'rand-test-percent'], e.target);
+                    updateNegativeSummary();
+                });
+            });
+
+            // 4. MOCK DATA: Simula o total de positivos
+            const positiveCountEl = document.getElementById('total-positive-count');
+            if (positiveCountEl && positiveCountEl.textContent === '0') positiveCountEl.textContent = '1000';
+
+            // 5. Listeners para a divisão de treino/val/teste positiva
+            // (Já conectados acima com enforcement de soma <= 100%)
+
 
             // --- ATIVAÇÃO DINÂMICA CRÍTICA ---
             async function initializeNegativeLines() {
@@ -1411,107 +1230,108 @@
             }
         }
 
-        // --- PREDICAO ---
         if (page === 'predicao') {
-            document.getElementById('run-prediction-btn')?.addEventListener('click', runPrediction);
-            const container = document.getElementById('models-container');
-            const selectAllCheckbox = document.getElementById('select-all-models');
-
-            // Carrega e renderiza a lista de modelos disponíveis
-            async function loadModelsIntoContainer() {
-                const cont = document.getElementById('models-container');
-                if (!cont) return;
-                cont.innerHTML = '<div class="card">Carregando modelos...</div>';
-                let models = [];
-                if (window.API && typeof window.API.getModels === 'function') {
-                    try { models = await window.API.getModels(); } catch (e) { models = []; }
-                }
-                cont.innerHTML = '';
-                if (!models || models.length === 0) {
-                    cont.innerHTML = '<div class="card">Nenhum modelo encontrado</div>';
-                    return;
-                }
-                // render grid
-                models.forEach((m, i) => {
-                    const item = document.createElement('div');
-                    item.className = 'model-item card model-item-compact';
-                    const cb = document.createElement('input');
-                    cb.type = 'checkbox';
-                    cb.className = 'model-checkbox';
-                    cb.id = `model-${i}`;
-                    cb.value = m;
-                    const lbl = document.createElement('label');
-                    lbl.htmlFor = cb.id;
-                    lbl.style.marginLeft = '8px';
-                    lbl.textContent = m;
-
-                    // when checkbox changes, persist and update UI highlight and summary
-                    cb.addEventListener('change', (ev) => {
-                        try {
-                            const sel = Array.from(document.querySelectorAll('.model-checkbox')).filter(x => x.checked).map(x => x.value);
-                            localStorage.setItem('selected_models', JSON.stringify(sel));
-                        } catch (e) { /* ignore storage errors */ }
-                        // toggle selected visual state on the parent item
-                        try { item.classList.toggle('selected', cb.checked); } catch (e) { /* ignore */ }
-                        updateSelectedSummary();
-                    });
-
-                    // clicking the label should toggle checkbox (ensure accessibility)
-                    lbl.addEventListener('click', (e) => {
-                        // native label click will toggle, but ensure update runs in all browsers
-                        setTimeout(() => { cb.dispatchEvent(new Event('change')); }, 10);
-                    });
-
-                    // assemble
-                    const leftWrap = document.createElement('div');
-                    leftWrap.style.display = 'flex';
-                    leftWrap.style.alignItems = 'center';
-                    leftWrap.appendChild(cb);
-                    leftWrap.appendChild(lbl);
-                    item.appendChild(leftWrap);
-                    cont.appendChild(item);
-                });
-
-                // restore persisted selection
-                try {
-                    const stored = JSON.parse(localStorage.getItem('selected_models') || '[]');
-                    if (Array.isArray(stored) && stored.length > 0) {
-                        document.querySelectorAll('.model-checkbox').forEach(cb => cb.checked = stored.includes(cb.value));
-                    }
-                } catch (e) { /* ignore malformed storage */ }
-
-                // wire select-all checkbox
-                const selAll = document.getElementById('select-all-models');
-                if (selAll) {
-                    selAll.checked = false;
-                    selAll.removeEventListener('change', selAll._listener);
-                    selAll._listener = (ev) => {
-                        const checked = ev.target.checked;
-                        document.querySelectorAll('.model-checkbox').forEach(cb => { cb.checked = checked; cb.dispatchEvent(new Event('change')); });
-                        updateSelectedSummary();
-                    };
-                    selAll.addEventListener('change', selAll._listener);
-                }
-
-                updateSelectedSummary();
-            }
-
-            // controla a visibilidade do input de pasta conforme a opção escolhida
-            function updateFolderInputVisibility() {
-                const src = document.getElementById('prediction-source');
-                const folderInput = document.getElementById('prediction-folder-input');
-                if (!src || !folderInput) return;
-                const v = src.value;
-                if (v === 'random' || v === 'folder') folderInput.classList.remove('hidden'); else folderInput.classList.add('hidden');
-            }
-
-            // inicialização da tela de predição
-            loadModelsIntoContainer().catch(e => console.warn('Falha ao carregar modelos:', e));
-            document.getElementById('prediction-source')?.addEventListener('change', updateFolderInputVisibility);
-            updateFolderInputVisibility();
+            initPredictionPage();
         }
     }
 
+    // --- PREDICAO ---
+    function initPredictionPage() {
+        document.getElementById('run-prediction-btn')?.addEventListener('click', runPrediction);
+
+        // Carrega e renderiza a lista de modelos disponíveis
+        async function loadModelsIntoContainer() {
+            const cont = document.getElementById('models-container');
+            if (!cont) return;
+            cont.innerHTML = '<div class="card">Carregando modelos...</div>';
+            let models = [];
+            if (window.API && typeof window.API.getModels === 'function') {
+                try { models = await window.API.getModels(); } catch (e) { models = []; }
+            }
+            cont.innerHTML = '';
+            if (!models || models.length === 0) {
+                cont.innerHTML = '<div class="card">Nenhum modelo encontrado</div>';
+                return;
+            }
+            // render grid
+            models.forEach((m, i) => {
+                const item = document.createElement('div');
+                item.className = 'model-item card model-item-compact';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'model-checkbox';
+                cb.id = `model-${i}`;
+                cb.value = m;
+                const lbl = document.createElement('label');
+                lbl.htmlFor = cb.id;
+                lbl.style.marginLeft = '8px';
+                lbl.textContent = m;
+
+                // when checkbox changes, persist and update UI highlight and summary
+                cb.addEventListener('change', (ev) => {
+                    try {
+                        const sel = Array.from(document.querySelectorAll('.model-checkbox')).filter(x => x.checked).map(x => x.value);
+                        localStorage.setItem('selected_models', JSON.stringify(sel));
+                    } catch (e) { /* ignore storage errors */ }
+                    // toggle selected visual state on the parent item
+                    try { item.classList.toggle('selected', cb.checked); } catch (e) { /* ignore */ }
+                    updateSelectedSummary();
+                });
+
+                // clicking the label should toggle checkbox (ensure accessibility)
+                lbl.addEventListener('click', (e) => {
+                    // native label click will toggle, but ensure update runs in all browsers
+                    setTimeout(() => { cb.dispatchEvent(new Event('change')); }, 10);
+                });
+
+                // assemble
+                const leftWrap = document.createElement('div');
+                leftWrap.style.display = 'flex';
+                leftWrap.style.alignItems = 'center';
+                leftWrap.appendChild(cb);
+                leftWrap.appendChild(lbl);
+                item.appendChild(leftWrap);
+                cont.appendChild(item);
+            });
+
+            // restore persisted selection
+            try {
+                const stored = JSON.parse(localStorage.getItem('selected_models') || '[]');
+                if (Array.isArray(stored) && stored.length > 0) {
+                    document.querySelectorAll('.model-checkbox').forEach(cb => cb.checked = stored.includes(cb.value));
+                }
+            } catch (e) { /* ignore malformed storage */ }
+
+            // wire select-all checkbox
+            const selAll = document.getElementById('select-all-models');
+            if (selAll) {
+                selAll.checked = false;
+                selAll.removeEventListener('change', selAll._listener);
+                selAll._listener = (ev) => {
+                    const checked = ev.target.checked;
+                    document.querySelectorAll('.model-checkbox').forEach(cb => { cb.checked = checked; cb.dispatchEvent(new Event('change')); });
+                    updateSelectedSummary();
+                };
+                selAll.addEventListener('change', selAll._listener);
+            }
+
+            updateSelectedSummary();
+        }
+
+        // controla a visibilidade do input de pasta conforme a opção escolhida
+        function updateFolderInputVisibility() {
+            const src = document.getElementById('prediction-source');
+            const folderInput = document.getElementById('prediction-folder-input');
+            if (!src || !folderInput) return;
+            const v = src.value;
+            if (v === 'random' || v === 'folder') folderInput.classList.remove('hidden'); else folderInput.classList.add('hidden');
+        }
+
+        // inicialização da tela de predição
+        loadModelsIntoContainer().catch(e => console.warn('Falha ao carregar modelos:', e));
+        document.getElementById('prediction-source')?.addEventListener('change', updateFolderInputVisibility);
+        updateFolderInputVisibility();
+    }
 
     // --- EXPOSIÇÃO GLOBAL ---
     global.UI = {
@@ -1520,24 +1340,40 @@
                 mi.removeEventListener('click', mi._uiClickListener);
                 mi._uiClickListener = (e) => {
                     const page = mi.dataset.page;
-                    if (page) navigate(page);
+                    if (page) Navigation.navigate(page);
                 };
                 mi.addEventListener('click', mi._uiClickListener);
             });
-            global.navigate = navigate;
-            global.toggleSidebar = toggleSidebar;
-            navigate('treinamento');
+            // Exponha funções globais usadas no HTML
+            global.navigate = (p) => Navigation.navigate(p);
+            global.toggleSidebar = () => (Navigation.toggleSidebar ? Navigation.toggleSidebar() : null);
+            // Carrega Treinamento por padrão logo ao iniciar
+            Navigation.navigate('treinamento');
+            // Fallback: se a view ainda estiver vazia após breve atraso, tenta novamente
+            setTimeout(() => {
+                const view = document.getElementById('view');
+                if (view && view.children.length === 0) {
+                    Navigation.navigate('treinamento');
+                }
+            }, 250);
+            // Segundo fallback: tenta novamente após 1s caso algo ainda não tenha carregado
+            setTimeout(() => {
+                const view = document.getElementById('view');
+                if (view && view.children.length === 0) {
+                    Navigation.navigate('treinamento');
+                }
+            }, 1000);
 
             // ensure modal close button/backdrop listeners exist
             document.getElementById('img-modal-close')?.addEventListener('click', closeImageModal);
             document.getElementById('img-modal-backdrop')?.addEventListener('click', closeImageModal);
         },
-        navigate,
+        bindPageHandlers,
         toggleLineSelection: global.toggleLineSelection,
         setNegativeSelectionMode,
-        collectTrainingPayload, // EXPÕE a função de coleta CORRIGIDA
-        openImageModal,         // EXPÕE a função de modal
-        updateNegativeSummary,  // EXPÕE a função de resumo para debug/chamadas externas (opcional)
+        collectTrainingPayload,
+        openImageModal,
+        updateNegativeSummary,
     };
 
 })(window);

@@ -24,7 +24,8 @@
 
 
         <div id="prediction-folder-input" class="mt-3 hidden" aria-hidden="true">
-            <label for="prediction-folder-path" class="text-sm text-muted">Caminho da pasta (ex: .\projeto\app\storage\datasets_yolo\CM\02)</label>
+            <label for="prediction-folder-path" class="text-sm text-muted">Caminho da pasta (ex:
+                .\projeto\app\storage\datasets_yolo\CM\02)</label>
             <input id="prediction-folder-path" type="text" placeholder="/path/to/images" class="mt-1" />
         </div>
     </div>
@@ -39,5 +40,27 @@
 
     <div id="prediction-results" class="prediction-results mt-6" aria-live="polite">
     </div>
-    <!-- debug/test controls removed to simplify UI -->
-</div>
+
+    <!-- Seção de Histórico de Predições -->
+    <div style="margin-top:20px; padding-top:20px; border-top:2px solid var(--border-color);">
+        <h3 style="margin:0 0 12px 0; font-size:1.1em; font-weight:600;">📜 Histórico de Predições</h3>
+
+        <div class="card" style="padding:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <label for="job-select" style="margin:0; font-weight:600; flex:0 0 auto;">Selecione um histórico:</label>
+            <select id="job-select" class="input" style="flex:1; min-width:220px; min-height:36px;"></select>
+            <button class="btn" id="job-select-apply" title="Carregar imagens do histórico selecionado"
+                style="background:#0066cc; color:white; padding:6px 14px; border:none; border-radius:4px; cursor:pointer; min-height:36px;">
+                ▶️ Carregar
+            </button>
+        </div>
+    </div>
+
+    <!-- Local onde as imagens de histórico de predições serão exibidas -->
+    <div id="training-images" class="training-images-area card" style="margin-top:12px; padding:12px;">
+        <!-- Imagens carregadas dinamicamente -->
+        <div id="training-images-placeholder"
+            style="min-height:200px; width:100%; display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:0.9em;">
+            Selecione um histórico e clique em "Carregar" para ver as imagens das predições
+        </div>
+        <!-- debug/test controls removed to simplify UI -->
+    </div>

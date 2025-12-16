@@ -5,19 +5,36 @@ Arquitetura (visão rápida)
 - Backend: Flask + Blueprints em projeto/app/routes
 - Frontend: HTML/CSS/JS em projeto/views consumindo APIs same-origin
 - Artefatos: runs/logs (treinamento) e predictions (resultados de predição)
+- Serviços: projeto/app/services (lógica de negócio reutilizável)
 
 Principais módulos
 
+Backend:
+- app.py — Servidor Flask principal com endpoints de imagens e predições
 - projeto/app/routes/training.py — API de treinamento (status/start/cancel/logs)
 - projeto/app/routes/prediction.py — API de predição (executa avaliação dos modelos)
 - projeto/app/routes/train_models.py — funções utilitárias para treinar/testar YOLO
+- projeto/app/services/prediction_service.py — lógica de resolução de modelos e execução
+- projeto/app/services/training_service.py — lógica de preparação de dataset e treinamento
+- projeto/app/services/utils.py — utilitários compartilhados
 - projeto/app/paths.py — utilitários de caminhos (workspace, storage)
+
+Frontend:
+- projeto/views/js/api.js — cliente HTTP para APIs
+- projeto/views/js/finder.js — busca de imagens de predição
+- projeto/views/js/modules/config.js — gerenciamento de configurações
+- projeto/views/js/modules/modal.js — visualização de imagens em tela cheia
+- projeto/views/js/modules/navigation.js — navegação entre páginas
+- projeto/views/js/training_control.js — controle de treinamento (SSE, polling)
+- projeto/views/js/ui.js — lógica principal da interface
 
 Decisões
 
-- Framework único: consolidado em Flask para evitar duplicidade com FastAPI.
-- Respostas: JSON consistentes com chaves status/detail em erros.
-- Tolerância a ambiente: lida com ausência de Ultralytics retornando mock.
+- Framework único: consolidado em Flask (FastAPI removido para evitar duplicidade)
+- Respostas: JSON consistentes com chaves status/detail em erros
+- Tolerância a ambiente: lida com ausência de Ultralytics retornando mock
+- Modularização: serviços backend e módulos frontend separados para reutilização
+- Código limpo: candidate_roots consolidado em função helper, imports organizados
 
 Rápido:
 
@@ -38,8 +55,9 @@ Variáveis de ambiente:
 - PORT: porta onde o servidor irá escutar (padrão no script: 8000)
 
 Notas:
-
-- O projeto contém tanto código baseado em Flask (`app.py` e `projeto/app/routes/*.py`) quanto alguns artefatos FastAPI em `projeto/app/main.py`. Atualmente o servidor principal é o Flask (arquivo `app.py`) e foi ajustado para registrar os blueprints em `projeto/app/routes` e servir `projeto/views`.
+usa Flask (`app.py`) como servidor principal com blueprints em `projeto/app/routes/*.py`
+- O servidor registra blueprints e serve arquivos estáticos de `projeto/views`
+- FastAPI (`projeto/app/main.py`) foi removido para eliminar duplicidade de frameworkstado para registrar os blueprints em `projeto/app/routes` e servir `projeto/views`.
 - Se preferir usar FastAPI/uvicorn, eu posso ajudar a migrar ou a criar uma camada ASGI que reúna tudo numa porta; isso exige converter as blueprints Flask para routers FastAPI ou expor o Flask app via ASGI adaptador.
 
 Como testar rapidamente:

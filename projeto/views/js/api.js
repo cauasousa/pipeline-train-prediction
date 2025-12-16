@@ -1,9 +1,18 @@
 (function (global) {
     // minimal network helpers and endpoints
-    // Use same origin by default so frontend works when served by the Flask app.
-    // Falls back to location origin which works in dev (http://localhost:PORT) and production.
-    const API_BASE = window.location.origin;
-    // const API_BASE = "https://efficacious-fanciful-vera.ngrok-free.dev";
+    // Resolve base da API com tolerância para ambientes file:// ou porta diferente
+    // Ordem de precedência:
+    // 1) global.API_BASE_OVERRIDE (permite configurar manualmente)
+    // 2) se origin for vazio/null/file:// -> usa http://localhost:5000 (default Flask)
+    // 3) caso contrário usa window.location.origin
+    const API_BASE = (function resolveApiBase() {
+        if (global.API_BASE_OVERRIDE) return global.API_BASE_OVERRIDE;
+        const origin = window.location.origin || '';
+        if (!origin || origin === 'null' || origin.startsWith('file:')) {
+            return 'http://localhost:8000';
+        }
+        return origin;
+    })();
 
     async function safeFetch(url, opts) {
         try {
@@ -45,7 +54,11 @@
     async function postPredict(payload) {
         try {
             const res = await fetch(`${API_BASE}/predict/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-            if (!res.ok) return null;
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                console.error('[API] postPredict error:', res.status, errorData);
+                return null;
+            }
             return await res.json();
         } catch (e) {
             console.error('[API] postPredict error', e);
@@ -118,8 +131,32 @@
     }
 
     async function getDatasets() {
-        const r = await safeFetch(`${API_BASE}/train/datasets`);
-        return r?.datasets ?? [];
+        // tenta no API_BASE atual; se vier vazio, tenta portas comuns
+        let datasets = [];
+        const first = await safeFetch(`${API_BASE}/train/datasets`);
+        if (first && Array.isArray(first.datasets)) datasets = first.datasets;
+
+        if (!datasets || datasets.length === 0) {
+            const tries = [
+                `${API_BASE}/train/datasets`,
+                'http://localhost:8000/train/datasets',
+                'http://localhost:5000/train/datasets'
+            ];
+            for (const url of tries) {
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    if (Array.isArray(data.datasets) && data.datasets.length) {
+                        datasets = data.datasets;
+                        break;
+                    }
+                } catch (e) {
+                    /* ignore and try next */
+                }
+            }
+        }
+        return datasets ?? [];
     }
 
     async function getDatasetInfo(name) {
@@ -154,5 +191,5 @@
         return r || {};
     }
 
-    global.API = Object.assign(global.API || {}, { API_BASE, safeFetch, testIsImage, getLastDir, getModels, postPredict, getPredictionsList, listModelsInRun, getDatasets, getNegativeLines, uploadDataset });
+    global.API = Object.assign(global.API || {}, { API_BASE, safeFetch, testIsImage, getLastDir, getModels, postPredict, getPredictionsList, listModelsInRun, getDatasets, getDatasetInfo, getNegativeLines, uploadDataset });
 })(window);

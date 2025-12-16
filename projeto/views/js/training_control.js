@@ -20,19 +20,38 @@
             this.startBtn = document.getElementById('start-training-btn');
             this.cancelBtn = document.getElementById('cancel-training-btn');
             this.logsElement = document.getElementById('logs');
+            this.jobSelect = document.getElementById('job-select');
+            this.jobSelectBtn = document.getElementById('job-select-apply');
 
             // Remove listeners antigos antes de adicionar novos
             this.startBtn.removeEventListener('click', this._startHandler);
             this.cancelBtn.removeEventListener('click', this._cancelHandler);
+            if (this.jobSelect) this.jobSelect.removeEventListener('change', this._jobSelectHandler);
+            if (this.jobSelectBtn) this.jobSelectBtn.removeEventListener('click', this._jobSelectClickHandler);
 
             this._startHandler = () => this.startTraining();
             this._cancelHandler = () => this.cancelTraining();
+            this._jobSelectClickHandler = () => this.handleJobSelection(this.jobSelect?.value);
 
             this.startBtn.addEventListener('click', this._startHandler);
             this.cancelBtn.addEventListener('click', this._cancelHandler);
+            // Apenas o botão dispara seleção - não o change do select para evitar duplicatas
+            if (this.jobSelectBtn) this.jobSelectBtn.addEventListener('click', this._jobSelectClickHandler);
 
             // 1. Verificar o estado inicial (caso o usuário atualize a página)
             this.checkInitialStatus();
+            // 2. Atualiza lista de jobs para seleção manual
+            this.refreshJobList();
+        },
+
+        handleJobSelection: function (jobId) {
+            // vazio => segue auto (último concluído ou ativo)
+            if (!jobId) {
+                this.checkInitialStatus();
+                return;
+            }
+            this.logsElement.value += `[INFO] Exibindo imagens do job: ${jobId}\n`;
+            this.setUIState(false, jobId);
         },
 
         setUIState: function (active, jobId = null) {
@@ -64,6 +83,11 @@
                 this.stopLogStream();
                 // O checkInitialStatus já garante que o polling do último job concluído seja iniciado 
                 // se o job ativo for 'null' e a UI estiver inativa.
+                if (jobId && this._currentJobFollowed !== jobId) {
+                    // Visualizar um job específico sem ativar estado de treino
+                    // Só inicia se for um job diferente do atual
+                    this.startImagePolling(jobId, true);
+                }
             }
         },
 
@@ -103,6 +127,7 @@
 
                     // Inicia o polling de imagens para o job ID mais recente
                     this.startImagePolling(latestJobId);
+                    this._setJobSelectValue(latestJobId);
 
                 } else if (!this._currentJobFollowed) {
                     this.logsElement.value += `[INFO] Nenhuma execução de treinamento anterior encontrada.\n`;
@@ -125,7 +150,22 @@
             const jobID = payload.exp_name;
 
             this.logsElement.value = `[INFO] Preparando treinamento... Job ID: ${jobID}\n`;
-            this.setUIState(true, jobID);
+            // Validação mínima: dataset obrigatório
+            if (!payload.dataset) {
+                this.logsElement.value += `[ERRO] Selecione um dataset antes de iniciar o treinamento.\n`;
+                this.setUIState(false);
+                return;
+            }
+            // NÃO iniciar stream ainda - apenas desabilitar UI
+            this.isTrainingActive = true;
+            this.jobID = jobID;
+            const inputsAndButtons = document.querySelectorAll(
+                '#training-page input:not(.config-textarea), #training-page select, #training-page button:not(#cancel-training-btn):not(#edit-config-btn):not(#save-config-btn):not(#cancel-config-btn):not(#reset-config-btn)'
+            );
+            inputsAndButtons.forEach(el => { el.disabled = true; });
+            this.startBtn.classList.toggle('hidden', true);
+            this.cancelBtn.classList.toggle('hidden', false);
+            this.cancelBtn.disabled = false;
 
             try {
                 const response = await fetch(`${this.API_BASE}/train/start`, {
@@ -136,15 +176,37 @@
 
                 const data = await response.json();
 
-                if (response.ok && data.status === 'training_started_async') {
-                    this.setUIState(true, data.job_id);
-                    // Force placeholders immediately for the new run (even if we were
-                    // already following the same job prefix). This ensures the UI
-                    // blanks out old images while new ones are being produced.
-                    try { this.startImagePolling(data.job_id, true); } catch (e) { /* ignore */ }
+                // Aceita respostas antigas ("started") e novas ("training_started_async")
+                if (response.ok && (data.status === 'training_started_async' || data.status === 'started')) {
+                    // IMPORTANTE: YOLO pode adicionar número sequencial ao nome (ex: treinamento_classificacao -> treinamento_classificacao4)
+                    // O backend cria arquivo de log com o nome ORIGINAL (data.job_id)
+                    // Mas o YOLO cria o diretório com número sequencial
+
+                    // Aguardar um pouco e buscar o job REAL que foi criado
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Aguarda 1 segundo
+                    await this.refreshJobList();
+
+                    // Busca o job mais recente que começa com o jobID
+                    const realJobId = await this._findRealJobId(data.job_id);
+                    const finalJobId = realJobId || data.job_id;
+
+                    this.logsElement.value += `[INFO] Job real criado: ${finalJobId}\n`;
+
+                    // CRÍTICO: 
+                    // - Log stream usa data.job_id (nome do arquivo .log no backend)
+                    // - Image polling usa finalJobId (nome real do diretório criado pelo YOLO)
+                    // - Job select mostra finalJobId (nome real)
+                    this.jobID = finalJobId; // Para exibição e cancelamento
+                    this._setJobSelectValue(finalJobId);
+
+                    // Inicia log stream com o nome ORIGINAL (arquivo .log)
+                    this.startLogStream(data.job_id);
+
+                    // Inicia image polling com o nome REAL (diretório)
+                    try { this.startImagePolling(finalJobId, true); } catch (e) { /* ignore */ }
                     // O log inicial foi limpado acima, a mensagem de start já será enviada pelo SSE
                 } else {
-                    this.logsElement.value += `[ERRO] ${data.message || 'Falha ao iniciar treino'}\n`;
+                    this.logsElement.value += `[ERRO] ${data.message || data.detail || 'Falha ao iniciar treino'}\n`;
                     this.setUIState(false);
                 }
             } catch (error) {
@@ -171,7 +233,7 @@
                     this.logsElement.value += `[INFO] ${data.message}. Aguardando o encerramento do stream...\n`;
                     // O setUIState(false) será chamado pelo SSE quando o log de cancelamento chegar.
                 } else {
-                    this.logsElement.value += `[ERRO] Falha ao cancelar: ${data.message || 'Erro desconhecido'}\n`;
+                    this.logsElement.value += `[ERRO] Falha ao cancelar: ${data.message || data.detail || 'Erro desconhecido'}\n`;
                     this.cancelBtn.disabled = false;
                 }
             } catch (error) {
@@ -201,14 +263,112 @@
                 ) {
                     this.stopLogStream();
                     this.setUIState(false);
+                    // Atualiza lista de jobs após conclusão
+                    this.refreshJobList().catch(e => console.warn('Erro ao atualizar jobs:', e));
                 }
             };
 
-            this.eventSource.onerror = (err) => {
+            this.eventSource.onerror = async (err) => {
                 console.error("EventSource failed:", err);
                 this.logsElement.value += '\n[ERROR] Conexão de log interrompida.\n';
                 this.stopLogStream();
+                // Verifica estado atual; se não houver treino ativo, ajusta UI
+                try {
+                    const st = await window.API.safeFetch(`${this.API_BASE}/train/status`);
+                    if (!st || !st.is_active || ["completed", "error", "cancelled"].includes(st.status)) {
+                        this.setUIState(false);
+                    }
+                } catch (_) { /* ignore */ }
             };
+        },
+
+        refreshJobList: async function () {
+            try {
+                const resp = await window.API.safeFetch(`${this.API_BASE}/train/jobs?prefix=treinamento_classificacao`);
+                const select = document.getElementById('job-select');
+                if (!select || !resp || !Array.isArray(resp.jobs)) return;
+                const currentValue = select.value;
+                select.innerHTML = '';
+
+                const addOption = (value, label) => {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    select.appendChild(opt);
+                };
+
+                addOption('', '— Último concluído / ativo —');
+                resp.jobs.forEach(j => addOption(j, j));
+
+                // Mantém seleção se existir
+                if (currentValue && resp.jobs.includes(currentValue)) {
+                    select.value = currentValue;
+                }
+            } catch (e) {
+                console.warn('Não foi possível carregar lista de jobs:', e);
+            }
+        },
+
+        _findRealJobId: async function (jobPrefix) {
+            /**
+             * Busca o job REAL criado pelo YOLO que pode ter número sequencial.
+             * Ex: jobPrefix="treinamento_classificacao" pode resultar em "treinamento_classificacao8"
+             * Tenta múltiplas vezes em caso do job ainda estar sendo criado.
+             */
+            const maxAttempts = 5;
+            let lastSeenJob = null;
+
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                try {
+                    const resp = await window.API.safeFetch(`${this.API_BASE}/train/jobs?prefix=${jobPrefix}`);
+                    if (!resp || !Array.isArray(resp.jobs) || resp.jobs.length === 0) {
+                        console.log(`[_findRealJobId] Tentativa ${attempt + 1}: nenhum job encontrado`);
+                        await new Promise(resolve => setTimeout(resolve, 500)); // Aguarda 500ms
+                        continue;
+                    }
+
+                    // O primeiro job na lista é o mais recente (a lista vem ordenada por mtime desc)
+                    const mostRecentJob = resp.jobs[0];
+
+                    // Se encontramos um job novo (diferente do anterior), retorna
+                    if (mostRecentJob !== lastSeenJob) {
+                        console.log(`[_findRealJobId] Tentativa ${attempt + 1}: encontrado job mais recente: ${mostRecentJob}`);
+                        return mostRecentJob;
+                    }
+
+                    lastSeenJob = mostRecentJob;
+                    console.log(`[_findRealJobId] Tentativa ${attempt + 1}: job igual ao anterior, aguardando...`);
+
+                    if (attempt < maxAttempts - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500)); // Aguarda 500ms antes de tentar novamente
+                    }
+                } catch (e) {
+                    console.warn(`[_findRealJobId] Erro na tentativa ${attempt + 1}:`, e);
+                    if (attempt < maxAttempts - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                }
+            }
+
+            console.warn('[_findRealJobId] Não conseguiu encontrar um novo job após várias tentativas');
+            return null;
+        },
+
+        _setJobSelectValue: function (jobId) {
+            const select = document.getElementById('job-select');
+            if (!select) return;
+            if (!jobId) {
+                select.value = '';
+                return;
+            }
+            const exists = Array.from(select.options).some(o => o.value === jobId);
+            if (!exists) {
+                const opt = document.createElement('option');
+                opt.value = jobId;
+                opt.textContent = jobId;
+                select.appendChild(opt);
+            }
+            select.value = jobId;
         },
 
         stopLogStream: function () {
@@ -222,47 +382,58 @@
         // ---------------- Image polling & UI helpers ----------------
         startImagePolling: function (jobId, force = false) {
             // Se já estamos seguindo este job e não for força, apenas mantém o intervalo
-            if (!force && this._currentJobFollowed === jobId && this._imagePollHandle) return;
+            if (!force && this._currentJobFollowed === jobId && this._imagePollHandle) {
+                console.log(`[DEBUG] Já seguindo job ${jobId}, mantendo intervalo`);
+                return;
+            }
 
+            console.log(`[DEBUG] Iniciando polling para job: ${jobId}, force=${force}`);
+
+            // GARANTIR que intervalos anteriores sejam limpos
             this.stopImagePolling();
-            this._shownImages = new Set();
-            this._imageElements = {};
+
+            // Limpar imagens antigas ANTES de resetar as estruturas de dados
+            this._clearImages(); // Isso já limpa _imageElements e _shownImages internamente
+
             this._currentJobFollowed = jobId || null;
             this._setJobHeader(jobId);
-            this._clearImages(); // Limpa as imagens antigas
 
-            // If a training run is active (we just started it) or we're forcing,
-            // set the placeholder window so we ignore images older than this time.
-            // Otherwise (viewing last completed), don't set placeholder filter.
-            if (this.isTrainingActive || force) {
+            // ONLY set the placeholder window when actually starting a NEW training run.
+            // When viewing a past job (force=true but isTrainingActive=false), we want ALL images.
+            if (this.isTrainingActive && !force) {
                 this._placeholderUntil = Date.now();
             } else {
                 this._placeholderUntil = null;
             }
 
-            // create placeholder rows so UI shows empty slots until new images arrive
-            try { this._createPlaceholders(); } catch (e) { /* ignore */ }
+            // NÃO criar placeholders - apenas mostrar imagens reais
+            // Isso evita confusão quando trocar entre jobs
 
             // try immediate then schedule
             this._pollImagesOnce(jobId);
-            this._imagePollHandle = setInterval(() => this._pollImagesOnce(jobId), 3000);
+            // IMPORTANTE: Não capturar jobId no closure - usar this._currentJobFollowed
+            this._imagePollHandle = setInterval(() => this._pollImagesOnce(this._currentJobFollowed), 3000);
+            console.log(`[DEBUG] Intervalo criado para job: ${jobId}, handle: ${this._imagePollHandle}`);
         },
 
         _clearImages: function () {
             const container = document.getElementById('training-images');
             if (!container) return;
-            const header = document.getElementById('training-images-header');
-            // Remove todos os filhos, exceto o cabeçalho (se existir)
-            let child = container.firstChild;
-            while (child) {
-                let nextChild = child.nextSibling;
+
+            console.log('[DEBUG] Limpando todas as imagens do container');
+
+            // Abordagem mais simples e confiável: usar Array.from para evitar problemas com live collections
+            const children = Array.from(container.children);
+            children.forEach(child => {
+                // Mantém apenas o header
                 if (child.id !== 'training-images-header') {
                     container.removeChild(child);
                 }
-                child = nextChild;
-            }
+            });
+
             this._imageElements = {};
             this._shownImages = new Set();
+            console.log('[DEBUG] Container limpo, _imageElements e _shownImages resetados');
         },
 
         _setJobHeader: function (jobId) {
@@ -278,35 +449,55 @@
                 container.insertBefore(header, container.firstChild);
             }
 
-            // A lógica de limpar imagens se o job mudar foi movida para startImagePolling, 
-            // mas mantemos o ajuste do texto do cabeçalho.
+            // Apenas atualiza o texto do cabeçalho - NÃO redefine this._currentJobFollowed
+            // (isso já foi feito em startImagePolling antes de chamar essa função)
             header.textContent = `Job: ${jobId || '—'}`;
-            this._currentJobFollowed = jobId;
         },
 
         stopImagePolling: function () {
             if (this._imagePollHandle) {
+                console.log(`[DEBUG] Parando intervalo: ${this._imagePollHandle}`);
                 clearInterval(this._imagePollHandle);
                 this._imagePollHandle = null;
             }
+        },
+
+        destroy: function () {
+            // Limpa todos os recursos do TrainingControl quando sai da página
+            console.log('[DEBUG] TrainingControl.destroy() - limpando recursos');
+            this.stopImagePolling();
+            this.stopLogStream();
+            this._currentJobFollowed = null;
         },
 
         _appendImageRow: function (labelText, imgs) {
             const container = document.getElementById('training-images');
             if (!container) return;
 
+            // Filtra placeholders vazios - não renderizar se todas as imagens forem placeholders
+            const hasRealImages = imgs.some(src => src !== this.PLACEHOLDER_SRC);
+            if (!hasRealImages) return;
+
             // use labelText as key to keep one row per logical group
             const key = String(labelText || 'row');
 
+            console.log(`[DEBUG] _appendImageRow: ${key}, existe=${!!this._imageElements[key]}, URLs:`, imgs.slice(0, 2).map(u => u.split('?')[0]));
+
             // If row already exists, update images
             if (this._imageElements && this._imageElements[key]) {
+                console.log(`[DEBUG] Atualizando row existente: ${key}`);
                 const rowObj = this._imageElements[key];
                 const grid = rowObj.grid;
                 // update existing img elements or append new ones
                 for (let i = 0; i < imgs.length; i++) {
                     const src = imgs[i];
                     if (rowObj.imgs[i]) {
-                        rowObj.imgs[i].src = src;
+                        console.log(`[DEBUG] Atualizando img[${i}] para: ${src.substring(0, 80)}`);
+                        // Force reload: clear src first, then set new one
+                        rowObj.imgs[i].src = '';
+                        setTimeout(() => {
+                            rowObj.imgs[i].src = src;
+                        }, 0);
                     } else {
                         const card = document.createElement('div');
                         card.className = 'comparison-card';
@@ -324,6 +515,7 @@
             }
 
             // Create the group using the same structure as prediction view
+            console.log(`[DEBUG] Criando nova row: ${key}`);
             const groupDiv = document.createElement('div');
             groupDiv.className = 'image-comparison-group card';
 
@@ -383,6 +575,10 @@
         },
 
         _pollImagesOnce: async function (jobId) {
+            // IMPORTANTE: jobId passado como parâmetro pode estar desatualizado se o intervalo
+            // foi criado para um job antigo. Sempre verificar o status atual primeiro.
+            console.log(`[DEBUG] _pollImagesOnce chamado com jobId: ${jobId}`);
+
             // Se o sistema estiver ativo, o status ativo sobrescreve a leitura do job ID.
             let currentJobToFollow = jobId;
             try {
@@ -390,7 +586,16 @@
                 if (status && status.is_active && status.job_id) {
                     currentJobToFollow = status.job_id;
                     this.jobID = currentJobToFollow;
-                    try { this._setJobHeader(currentJobToFollow); } catch (e) { /* ignore */ }
+                    // Se o job mudou, limpar imagens antigas completamente
+                    if (this._currentJobFollowed && this._currentJobFollowed !== currentJobToFollow) {
+                        console.log(`[DEBUG] Job mudou de ${this._currentJobFollowed} para ${currentJobToFollow} - limpando imagens`);
+                        this._clearImages();
+                        this._shownImages = new Set();
+                        this._imageElements = {};
+                    }
+                    this._currentJobFollowed = currentJobToFollow;
+                    // NÃO sobrescrever o header aqui - foi definido corretamente em startImagePolling
+                    // this._setJobHeader(currentJobToFollow);
                 }
             } catch (e) {
                 // ignore
@@ -399,6 +604,7 @@
             if (!currentJobToFollow) return;
 
             jobId = currentJobToFollow; // Usamos o job ID definitivo para a busca
+            console.log(`[DEBUG] Buscando imagens para job: ${jobId}`);
 
             try {
                 // Apenas usa o endpoint diagnóstico `/train/images/<job>` como fonte única de verdade.
@@ -417,6 +623,8 @@
                 const valMap = {}; // idx -> {label, pred, label_mtime, pred_mtime}
                 const confusion = { norm: null, raw: null };
                 const results = [];
+
+                console.log(`[DEBUG] Processando ${diag.images.length} imagens do job ${jobId}`);
 
                 for (const it of diag.images) {
                     // ignore images older than placeholder threshold when placeholders are active
