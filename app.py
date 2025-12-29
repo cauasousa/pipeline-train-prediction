@@ -180,9 +180,12 @@ def serve_train_image(job_id, name):
 
 
 
+import re
+from pathlib import Path
+
 @app.route('/train/images/<job_id>')
 def list_train_images(job_id):
-    """Lista imagens encontradas para job_id."""
+    """Lista imagens encontradas para o job_id mais recente (maior incremento)."""
     exts = ['.jpg', '.png', '.jpeg']
     patterns = ['train_batch', 'val_batch', 'confusion_matrix', 'results']
     
@@ -192,56 +195,78 @@ def list_train_images(job_id):
     resolved_root = None
     resolved_name = None
 
-    # Busca direta pelo nome EXATO do job (não usar _resolve_job_folder que busca o mais recente)
+    print("=-=-=-=- Iniciando busca pelo job mais recente =-=-=-=-")
+
     for root in get_candidate_roots():
-        try:
-            root_path = Path(root)
-            if not root_path.exists():
-                continue
-            # Procura diretório com nome EXATO
-            job_dir = root_path / job_id
-            if job_dir.exists() and job_dir.is_dir():
-                resolved_root = root_path
-                resolved_name = job_id
-                search_dirs.append(job_dir)
-                search_dirs.append(job_dir / 'predicao')
-                break  # Encontrou, não precisa continuar
-        except Exception:
+        root_path = Path(root)
+        if not root_path.exists():
             continue
 
-    # Se não encontrou, retorna vazio
+        # 1. Buscar todas as pastas que começam com o job_id
+        # Ex: treinamento_classificacao, treinamento_classificacao2, treinamento_classificacao17
+        candidate_folders = []
+        for p in root_path.iterdir():
+            if p.is_dir() and p.name.startswith(job_id):
+                # Usamos regex para garantir que capturamos o sufixo numérico corretamente
+                # Isso evita pegar "treinamento_classificacao_backup" por engano
+                if p.name == job_id or re.match(rf"^{job_id}\d+$", p.name):
+                    candidate_folders.append(p)
+
+        if not candidate_folders:
+            continue
+
+        # 2. Encontrar a pasta com o maior sufixo numérico
+        def get_suffix_num(path_obj):
+            name = path_obj.name
+            if name == job_id:
+                return 0
+            # Extrai apenas os números após o nome base
+            suffix = name[len(job_id):]
+            return int(suffix) if suffix.isdigit() else 0
+
+        # Ordena pelas pastas com maior número no final
+        latest_job_dir = max(candidate_folders, key=get_suffix_num)
+        
+        resolved_root = root_path
+        resolved_name = latest_job_dir.name  # Aqui será 'treinamento_classificacao17'
+        search_dirs.append(latest_job_dir)
+        search_dirs.append(latest_job_dir / 'predicao')
+        
+        print(f"Diretório mais recente encontrado: {latest_job_dir}")
+        break 
+
     if not search_dirs:
         return jsonify({"images": [], "resolved_folder": None, "error": "job_not_found"})
 
+    # O restante do seu loop de busca de imagens permanece quase igual, 
+    # mas recomendo usar resolved_name na URL para garantir o path correto da imagem
     for base in search_dirs:
         try:
             if not base or not base.exists():
                 continue
             for f in base.iterdir():
+                if(f.name == 'results.csv'):
+                    continue
                 if not f.is_file():
                     continue
                 lname = f.name.lower()
-                for pat in patterns:
-                    if pat in lname:
-                        full = str(f.resolve())
-                        if full in seen:
-                            continue
-                        seen.add(full)
-                        base_no_ext = f.stem
-                        try:
-                            mtime = int(f.stat().st_mtime)
-                        except Exception:
-                            mtime = int(time.time())
-                        # IMPORTANTE: usar job_id na URL, não resolved_name
-                        url = request.url_root.rstrip('/') + f"/train/image/{job_id}/{base_no_ext}?t={mtime}"
-                        found.append({"name": f.name, "fullpath": full, "url": url, "mtime": mtime})
-        except Exception:
+                if any(pat in lname for pat in patterns):
+                    full = str(f.resolve())
+                    if full in seen:
+                        continue
+                    seen.add(full)
+                    base_no_ext = f.stem
+                    mtime = int(f.stat().st_mtime) if hasattr(f.stat(), 'st_mtime') else int(time.time())
+                    
+                    # DICA: Use o resolved_name (o nome da pasta real) para a URL
+                    url = f"{request.url_root.rstrip('/')}/train/image/{resolved_name}/{base_no_ext}?t={mtime}"
+                    found.append({"name": f.name, "fullpath": full, "url": url, "mtime": mtime})
+        except Exception as e:
+            print(f"Erro ao processar pasta {base}: {e}")
             continue
-
-    resp = {"images": found, "resolved_folder": resolved_name}
-    if resolved_root:
-        resp["resolved_root"] = str(resolved_root)
-    return jsonify(resp)
+    print("=-=-=-=- Busca concluída =-=-=-=-")
+    print(f"Imagens encontradas: {resolved_root} / {resolved_name} -> {found} imagens")
+    return jsonify({"images": found, "resolved_folder": resolved_name, "resolved_root": str(resolved_root)})
 
 
 @app.route("/predictions/<path:filename>")

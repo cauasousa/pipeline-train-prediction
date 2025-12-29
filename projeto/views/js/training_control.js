@@ -12,6 +12,7 @@
         _imageElements: null,
         _placeholderUntil: null, // ms timestamp — when set, ignore images older than this
         _currentJobFollowed: null,
+        _manualViewActive: false,
 
         init: function () {
             // Garante que só inicializa se estiver na página de treinamento (os elementos existem)
@@ -22,21 +23,25 @@
             this.logsElement = document.getElementById('logs');
             this.jobSelect = document.getElementById('job-select');
             this.jobSelectBtn = document.getElementById('job-select-apply');
+            this.jobRefreshBtn = document.getElementById('job-refresh-btn');
 
             // Remove listeners antigos antes de adicionar novos
             this.startBtn.removeEventListener('click', this._startHandler);
             this.cancelBtn.removeEventListener('click', this._cancelHandler);
             if (this.jobSelect) this.jobSelect.removeEventListener('change', this._jobSelectHandler);
             if (this.jobSelectBtn) this.jobSelectBtn.removeEventListener('click', this._jobSelectClickHandler);
+            if (this.jobRefreshBtn) this.jobRefreshBtn.removeEventListener('click', this._jobRefreshClickHandler);
 
             this._startHandler = () => this.startTraining();
             this._cancelHandler = () => this.cancelTraining();
             this._jobSelectClickHandler = () => this.handleJobSelection(this.jobSelect?.value);
+            this._jobRefreshClickHandler = () => this.refreshJobList();
 
             this.startBtn.addEventListener('click', this._startHandler);
             this.cancelBtn.addEventListener('click', this._cancelHandler);
             // Apenas o botão dispara seleção - não o change do select para evitar duplicatas
             if (this.jobSelectBtn) this.jobSelectBtn.addEventListener('click', this._jobSelectClickHandler);
+            if (this.jobRefreshBtn) this.jobRefreshBtn.addEventListener('click', this._jobRefreshClickHandler);
 
             // 1. Verificar o estado inicial (caso o usuário atualize a página)
             this.checkInitialStatus();
@@ -47,9 +52,11 @@
         handleJobSelection: function (jobId) {
             // vazio => segue auto (último concluído ou ativo)
             if (!jobId) {
+                this._manualViewActive = false;
                 this.checkInitialStatus();
                 return;
             }
+            this._manualViewActive = true;
             this.logsElement.value += `[INFO] Exibindo imagens do job: ${jobId}\n`;
             this.setUIState(false, jobId);
         },
@@ -197,7 +204,9 @@
                     // - Image polling usa finalJobId (nome real do diretório criado pelo YOLO)
                     // - Job select mostra finalJobId (nome real)
                     this.jobID = finalJobId; // Para exibição e cancelamento
-                    this._setJobSelectValue(finalJobId);
+                    // Seguir automaticamente o job ativo -> selector em branco
+                    this._manualViewActive = false;
+                    this._setJobSelectValue('');
 
                     // Inicia log stream com o nome ORIGINAL (arquivo .log)
                     this.startLogStream(data.job_id);
@@ -398,13 +407,10 @@
             this._currentJobFollowed = jobId || null;
             this._setJobHeader(jobId);
 
-            // ONLY set the placeholder window when actually starting a NEW training run.
-            // When viewing a past job (force=true but isTrainingActive=false), we want ALL images.
-            if (this.isTrainingActive && !force) {
-                this._placeholderUntil = Date.now();
-            } else {
-                this._placeholderUntil = null;
-            }
+            // Não ajustar janela de placeholders aqui.
+            // Em reentradas na página durante um treino ativo, devemos exibir TODAS as imagens já geradas.
+            // Mantemos ou limpamos este valor explicitamente em transições de estado.
+            this._placeholderUntil = null;
 
             // NÃO criar placeholders - apenas mostrar imagens reais
             // Isso evita confusão quando trocar entre jobs
@@ -468,6 +474,8 @@
             this.stopImagePolling();
             this.stopLogStream();
             this._currentJobFollowed = null;
+            this._placeholderUntil = null;
+            this._manualViewActive = false;
         },
 
         _appendImageRow: function (labelText, imgs) {
@@ -488,6 +496,11 @@
                 console.log(`[DEBUG] Atualizando row existente: ${key}`);
                 const rowObj = this._imageElements[key];
                 const grid = rowObj.grid;
+                // Atualiza classe de colunas conforme quantidade
+                const desiredColsClass = 'comparison-grid' + (imgs.length > 2 ? ' comparison-grid-cols-3' : ' comparison-grid-cols-2');
+                if (grid.className !== desiredColsClass) {
+                    grid.className = desiredColsClass;
+                }
                 // update existing img elements or append new ones
                 for (let i = 0; i < imgs.length; i++) {
                     const src = imgs[i];
@@ -510,6 +523,23 @@
                         grid.appendChild(card);
                         rowObj.imgs.push(imgEl || card.querySelector('img'));
                     }
+                }
+                // Remove imagens excedentes se o novo conjunto for menor
+                while (rowObj.imgs.length > imgs.length) {
+                    const lastImg = rowObj.imgs.pop();
+                    try {
+                        const cardToRemove = lastImg.closest('.comparison-card') || lastImg.parentElement?.parentElement;
+                        if (cardToRemove && cardToRemove.parentNode === grid) {
+                            grid.removeChild(cardToRemove);
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+                // Se não restou nenhuma imagem, remover a linha inteira
+                if (imgs.length === 0) {
+                    if (rowObj.group && rowObj.group.parentNode) {
+                        rowObj.group.parentNode.removeChild(rowObj.group);
+                    }
+                    delete this._imageElements[key];
                 }
                 return;
             }
@@ -560,6 +590,22 @@
             this._imageElements[key] = { group: groupDiv, grid: comparisonGrid, imgs: imgsEl, label: labelText };
         },
 
+        _pruneMissingRows: function (seenKeys) {
+            if (!this._imageElements) return;
+            try {
+                const existingKeys = Object.keys(this._imageElements);
+                for (const key of existingKeys) {
+                    if (!seenKeys.has(key)) {
+                        const rowObj = this._imageElements[key];
+                        if (rowObj && rowObj.group && rowObj.group.parentNode) {
+                            rowObj.group.parentNode.removeChild(rowObj.group);
+                        }
+                        delete this._imageElements[key];
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        },
+
         _createPlaceholders: function () {
             // create a predictable set of placeholder rows so UI shows empty slots immediately
             const ph = this.PLACEHOLDER_SRC;
@@ -584,18 +630,23 @@
             try {
                 const status = await window.API.safeFetch(`${this.API_BASE}/train/status`);
                 if (status && status.is_active && status.job_id) {
-                    currentJobToFollow = status.job_id;
-                    this.jobID = currentJobToFollow;
-                    // Se o job mudou, limpar imagens antigas completamente
-                    if (this._currentJobFollowed && this._currentJobFollowed !== currentJobToFollow) {
-                        console.log(`[DEBUG] Job mudou de ${this._currentJobFollowed} para ${currentJobToFollow} - limpando imagens`);
-                        this._clearImages();
-                        this._shownImages = new Set();
-                        this._imageElements = {};
+                    // Apenas segue automaticamente o job ativo quando não estamos em visualização manual
+                    if (this.isTrainingActive && !this._manualViewActive) {
+                        currentJobToFollow = status.job_id;
+                        this.jobID = currentJobToFollow;
+                        // Se o job mudou, limpar imagens e atualizar cabeçalho
+                        if (this._currentJobFollowed && this._currentJobFollowed !== currentJobToFollow) {
+                            console.log(`[DEBUG] Job mudou de ${this._currentJobFollowed} para ${currentJobToFollow} - limpando imagens e atualizando header`);
+                            this._clearImages();
+                            this._shownImages = new Set();
+                            this._imageElements = {};
+                        }
+                        this._currentJobFollowed = currentJobToFollow;
+                        this._setJobHeader(currentJobToFollow);
+                        // Mantém seletor em branco quando seguindo automaticamente o job ativo
+                        const select = document.getElementById('job-select');
+                        if (select) select.value = '';
                     }
-                    this._currentJobFollowed = currentJobToFollow;
-                    // NÃO sobrescrever o header aqui - foi definido corretamente em startImagePolling
-                    // this._setJobHeader(currentJobToFollow);
                 }
             } catch (e) {
                 // ignore
@@ -618,6 +669,7 @@
                 }
 
                 // Agrupa as imagens retornadas pelo diagnóstico
+                const seenKeys = new Set();
                 const thresholdSec = this._placeholderUntil ? Math.floor(this._placeholderUntil / 1000) : 0;
                 const trainImgs = [];
                 const valMap = {}; // idx -> {label, pred, label_mtime, pred_mtime}
@@ -656,11 +708,12 @@
                         results.push(serveUrl);
                     } else {
                         // generic: append as single
+                        seenKeys.add(it.name);
                         this._appendImageRow(it.name, [serveUrl]);
                     }
                 }
 
-                if (trainImgs.length) this._appendImageRow('Train batches', trainImgs);
+                if (trainImgs.length) { seenKeys.add('Train batches'); this._appendImageRow('Train batches', trainImgs); }
                 Object.keys(valMap).sort((a, b) => Number(a) - Number(b)).forEach(idx => {
                     const pair = valMap[idx];
                     // require both label and pred to be present and newer than threshold
@@ -670,11 +723,16 @@
                             const pm = Number(pair.pred_mtime || 0);
                             if (thresholdSec && (lm < thresholdSec || pm < thresholdSec)) return;
                         } catch (e) { /* ignore */ }
-                        this._appendImageRow(`Val batch ${idx}`, [pair.label, pair.pred]);
+                        const key = `Val batch ${idx}`;
+                        seenKeys.add(key);
+                        this._appendImageRow(key, [pair.label, pair.pred]);
                     }
                 });
-                if (confusion.norm && confusion.raw) this._appendImageRow('Confusion matrices', [confusion.norm, confusion.raw]);
-                if (results.length) this._appendImageRow('Results', [results[0]]);
+                if (confusion.norm && confusion.raw) { seenKeys.add('Confusion matrices'); this._appendImageRow('Confusion matrices', [confusion.norm, confusion.raw]); }
+                if (results.length) { seenKeys.add('Results'); this._appendImageRow('Results', [results[0]]); }
+
+                // Remove quaisquer linhas antigas que não apareceram neste ciclo
+                this._pruneMissingRows(seenKeys);
 
                 return;
             } catch (e) {
