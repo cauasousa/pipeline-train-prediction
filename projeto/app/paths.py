@@ -32,7 +32,8 @@ def upload_folder_root() -> Path:
 
 
 def storage_models_yolo_dir() -> Path:
-    return workspace_root() / 'storage' / 'models_yolo'
+    """Retorna o diretório onde os modelos treinados são salvos"""
+    return workspace_root() / 'models_yolo'
 
 
 def storage_imagens_implates_dir() -> Path:
@@ -40,4 +41,33 @@ def storage_imagens_implates_dir() -> Path:
 
 
 def storage_datasets_yolo_dir() -> Path:
-    return workspace_root() / 'storage' / 'datasets_yolo'
+    """Retorna o diretório de datasets de treinamento (custom/datasets_custom)"""
+    return datasets_custom_dir()
+
+def predictions_datasets_yolo_dir() -> Path:
+    return workspace_root() / 'predictions'
+
+def predictions_images_dir() -> Path:
+    """Retorna o diretório raiz para imagens de predição (./predictions_images)"""
+    return workspace_root() / 'predictions_images'
+
+def predictions_images_default_dir() -> Path:
+    """Retorna o diretório padrão para imagens de predição"""
+    return predictions_images_dir() / 'images_default'
+
+def predictions_images_upload_dir() -> Path:
+    """Retorna o diretório para imagens feitas upload"""
+    return predictions_images_dir() / 'images_upload'
+
+def get_dataset_split_dir(dataset_name: str, split: str = 'val') -> Path:
+    """
+    Retorna o caminho para um split específico (val/test) de um dataset.
+    
+    Args:
+        dataset_name: Nome do dataset (ex: 'CM', 'implantes')
+        split: 'val' ou 'test'
+    
+    Returns:
+        Path para datasets_custom/{dataset_name}/{split}/
+    """
+    return datasets_custom_dir() / dataset_name / split 

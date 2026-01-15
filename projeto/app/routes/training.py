@@ -10,7 +10,7 @@ from flask import Response, jsonify, request, Blueprint
 import signal
 import os
 
-from projeto.app.paths import upload_folder_uploads_dir, upload_folder_root
+from projeto.app.paths import upload_folder_uploads_dir, upload_folder_root, datasets_custom_dir
 from projeto.app.services.training_service import (
     prepare_dataset,
     execute_training_subprocess,
@@ -309,6 +309,7 @@ def list_uploaded_datasets():
     base_root = str(upload_folder_root())
     alt_root = os.path.join(base_root, 'AQUI')
     dirs_found = set()
+    custom_found = set()
 
     def scan_root(root):
         if not os.path.isdir(root):
@@ -325,8 +326,34 @@ def list_uploaded_datasets():
     scan_root(base_root)
     scan_root(alt_root)
 
-    results = sorted(dirs_found)
-    return jsonify({'datasets': results})
+    # Também lista datasets do diretório custom/datasets_custom
+    try:
+        custom_root = str(datasets_custom_dir())
+        if os.path.isdir(custom_root):
+            for name in os.listdir(custom_root):
+                dpath = os.path.join(custom_root, name)
+                if not os.path.isdir(dpath):
+                    continue
+                # Considera como dataset válido se existir subpasta 'val' ou 'test' com quaisquer arquivos
+                has_split = False
+                for split in ("val", "test"):
+                    sp = os.path.join(dpath, split)
+                    if os.path.isdir(sp):
+                        # verifica se há ao menos um arquivo dentro
+                        for _, _, files in os.walk(sp):
+                            if files:
+                                has_split = True
+                                break
+                    if has_split:
+                        break
+                if has_split:
+                    custom_found.add(name)
+    except Exception as e:
+        print(f"[AVISO] Falha ao listar datasets customizados: {e}")
+
+    # Une resultados (uploads + custom)
+    all_results = sorted(dirs_found.union(custom_found))
+    return jsonify({'datasets': all_results})
 
 
 @bp.route('/dataset-info/<path:ds>', methods=['GET'])

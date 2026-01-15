@@ -55,6 +55,20 @@
         if (area) area.value = `[${t}] ${msg}\n` + area.value;
     }
 
+    // Normaliza caminhos digitados pelo usuário para evitar barras duplicadas e padronizar separadores
+    // Ex.: "C://Users//Name//Pictures" -> "C:/Users/Name/Pictures"
+    function normalizeServerPath(p) {
+        if (!p || typeof p !== 'string') return p;
+        let s = p.trim();
+        // Converte todos separadores para "/" e colapsa repetições
+        s = s.replace(/[\\\/]+/g, '/');
+        // Garante que drive letter tenha "/" após ":" (C:/)
+        s = s.replace(/^([A-Za-z]):(?!\/)/, '$1:/');
+        // Remove barra final (exceto raiz tipo C:/)
+        if (!/^([A-Za-z]:\/)$/.test(s)) s = s.replace(/\/$/, '');
+        return s;
+    }
+
     function updateSelectedSummary() {
         const summaryEl = document.getElementById('selected-summary');
         if (!summaryEl) return;
@@ -64,13 +78,41 @@
         if ((!selectedModels || selectedModels.length === 0)) {
             try { selectedModels = JSON.parse(localStorage.getItem('selected_models') || '[]') || []; } catch (e) { selectedModels = []; }
         }
-        const source = document.getElementById('prediction-source')?.value ?? null;
+
+        // Obtém fonte do source card selecionado
+        let source = '';
+        const selectedCard = document.querySelector('.source-card.selected');
+        if (selectedCard) {
+            const dataSource = selectedCard.dataset.source;
+            if (dataSource === 'validation') {
+                source = 'Validação (Dataset)';
+            } else if (dataSource === 'test') {
+                source = 'Teste (Dataset)';
+            } else if (dataSource === 'folder') {
+                source = 'Pasta Específica';
+            } else if (dataSource === 'upload') {
+                source = 'Upload de Imagens';
+            }
+        }
+
+        const datasetSelect = document.getElementById('prediction-dataset');
+        const datasetValue = datasetSelect?.value ?? null;
         const folderPath = document.getElementById('prediction-folder-path')?.value ?? null;
+        const uploadFiles = document.getElementById('prediction-upload-files');
+        const fileCount = uploadFiles?.files?.length ?? 0;
+
         let parts = [];
         parts.push(`<strong>Modelos:</strong> ${selectedModels.length ? selectedModels.join(', ') : 'nenhum'}`);
-        if (source) {
-            parts.push(`<strong>Fonte:</strong> ${source}`);
-            if (['random', 'folder'].includes(source)) parts.push(`<strong>Path:</strong> ${folderPath || '<em>não informado</em>'}`);
+        parts.push(`<strong>Fonte:</strong> ${source}`);
+
+        if (source.includes('Validação') || source.includes('Teste')) {
+            if (datasetValue) {
+                parts.push(`<strong>Dataset:</strong> ${datasetValue}`);
+            }
+        } else if (source === 'Pasta Específica') {
+            parts.push(`<strong>Caminho:</strong> ${folderPath || '<em>não informado</em>'}`);
+        } else if (source === 'Upload de Imagens') {
+            parts.push(`<strong>Arquivos:</strong> ${fileCount} imagem${fileCount !== 1 ? 's' : ''} selecionada${fileCount !== 1 ? 's' : ''}`);
         }
         summaryEl.innerHTML = parts.map(p => `<div style="margin-bottom:6px">${p}</div>`).join('');
         if ((selectedModels && selectedModels.length > 0) || source) summaryEl.classList.remove('hidden'); else summaryEl.classList.add('hidden');
@@ -207,23 +249,40 @@
 
             // Se não está marcado, mostramos quantas linhas existem disponíveis
             if (!typeCheckbox || !typeCheckbox.checked) {
-                if (linesCountCell) linesCountCell.textContent = `${availableLines} Linhas`;
+                if (linesCountCell) linesCountCell.innerHTML = `<span class="badge">${availableLines} Linhas</span>`;
                 if (totalCountCell) totalCountCell.textContent = `0`;
             } else {
                 const modeLabel = selectedMode === 'select' ? 'Selecionar Linhas' : 'Implantes Aleatórios';
-                if (linesCountCell) linesCountCell.textContent = `${linesCount} Linhas (${modeLabel})`;
-                if (totalCountCell) totalCountCell.textContent = `${typeTotal}`;
+                if (linesCountCell) linesCountCell.innerHTML = `<span class="badge">${linesCount} Linhas (${modeLabel})</span>`;
+                if (totalCountCell) totalCountCell.innerHTML = `<span class="badge">${typeTotal}</span>`;
             }
 
             totalNegatives += typeTotal;
         });
 
         // 3. Atualiza o Resumo Geral
-        const totalPositives = Number(document.getElementById('total-positive-count')?.textContent || 0); // Exemplo mock: 1000
+        const totalPositives = Number(document.getElementById('total-positive-count')?.textContent || 0);
         const totalAll = totalPositives + totalNegatives;
 
         if (document.getElementById('total-negative-count')) document.getElementById('total-negative-count').textContent = totalNegatives;
         if (document.getElementById('total-all')) document.getElementById('total-all').textContent = totalAll;
+
+        // Verifica desbalanceamento e mostra alerta
+        const alertEl = document.getElementById('dataset-balance-alert');
+        if (alertEl && totalAll > 0) {
+            const negativePercent = (totalNegatives / totalAll) * 100;
+            const positivePercent = (totalPositives / totalAll) * 100;
+
+            if (negativePercent < 5 || positivePercent < 5) {
+                alertEl.className = 'alert-warning';
+                alertEl.style.display = 'block';
+                const minClass = negativePercent < positivePercent ? 'negativa' : 'positiva';
+                const minPercent = Math.min(negativePercent, positivePercent).toFixed(1);
+                alertEl.innerHTML = `⚠ Dataset altamente desbalanceado — classe ${minClass} &lt; ${minPercent}%`;
+            } else {
+                alertEl.style.display = 'none';
+            }
+        }
 
         // Recalcula os splits separadamente para positivos e negativos e depois soma para o split total
         const posTrainPct = Number(document.getElementById('train-percent')?.value || 0);
@@ -264,6 +323,142 @@
 
         // Atualiza a divisão específica dos NEGATIVOS no resumo
         if (document.getElementById('negative-split')) document.getElementById('negative-split').textContent = `${negTrain} / ${negVal} / ${negTest}`;
+
+        console.log('[updateNegativeSummary] Dados calculados para gráficos:', {
+            posTotal, negTotal, totalAll,
+            posTrain, posVal, posTest,
+            negTrain, negVal, negTest,
+            totalTrain, totalVal, totalTest
+        });
+
+        // Atualiza os gráficos com os novos dados
+        updateDatasetGraphs({
+            posTotal, negTotal, totalAll,
+            posTrain, posVal, posTest,
+            negTrain, negVal, negTest,
+            totalTrain, totalVal, totalTest
+        });
+    }
+
+    /**
+     * Atualiza os gráficos Chart.js com os dados de treino
+     */
+    let chartsInstances = {
+        proportion: null,
+        stacked: null
+    };
+
+    function updateDatasetGraphs(data) {
+        // Se Chart.js não está disponível, retorna sem erro
+        if (!window.Chart) {
+            console.warn('Chart.js não foi carregado ainda');
+            return;
+        }
+
+        console.log('[updateDatasetGraphs] Data recebida:', data);
+
+        const {
+            posTotal, negTotal, totalAll,
+            posTrain, posVal, posTest,
+            negTrain, negVal, negTest,
+            totalTrain, totalVal, totalTest
+        } = data;
+
+        // Atualiza KPI cards
+        const kpiTotal = document.getElementById('kpi-total');
+        const kpiPositive = document.getElementById('kpi-positive');
+        const kpiNegative = document.getElementById('kpi-negative');
+
+        console.log('[updateDatasetGraphs] KPI Elements:', { kpiTotal, kpiPositive, kpiNegative });
+
+        if (kpiTotal) {
+            kpiTotal.textContent = totalAll;
+            console.log('[updateDatasetGraphs] kpi-total atualizado para:', totalAll);
+        }
+        if (kpiPositive) {
+            kpiPositive.textContent = posTotal;
+            console.log('[updateDatasetGraphs] kpi-positive atualizado para:', posTotal);
+        }
+        if (kpiNegative) {
+            kpiNegative.textContent = negTotal;
+            console.log('[updateDatasetGraphs] kpi-negative atualizado para:', negTotal);
+        }
+
+        // Obtém contextos dos canvas
+        const canvasProportion = document.getElementById('chart-proportion');
+        const canvasStacked = document.getElementById('chart-stacked-bars');
+
+        console.log('[updateDatasetGraphs] Canvas Elements:', { canvasProportion, canvasStacked });
+
+        if (!canvasProportion || !canvasStacked) {
+            console.warn('[updateDatasetGraphs] Um ou mais canvas elements não foram encontrados!');
+            return;
+        }
+
+        // --- Gráfico 1: Donut (Positivo vs Negativo) ---
+        if (chartsInstances.proportion) chartsInstances.proportion.destroy();
+        chartsInstances.proportion = new Chart(canvasProportion, {
+            type: 'doughnut',
+            data: {
+                labels: ['Positivas', 'Negativas'],
+                datasets: [{
+                    data: [posTotal, negTotal],
+                    backgroundColor: ['#28a745', '#dc3545'],
+                    borderColor: ['#1e7e34', '#bd2130'],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 15, font: { size: 12 } }
+                    }
+                }
+            }
+        });
+
+        // --- Gráfico 2: Barras Empilhadas (Train/Val/Test com Pos+Neg empilhados) ---
+        if (chartsInstances.stacked) chartsInstances.stacked.destroy();
+        chartsInstances.stacked = new Chart(canvasStacked, {
+            type: 'bar',
+            data: {
+                labels: ['Train', 'Val', 'Test'],
+                datasets: [
+                    {
+                        label: 'Positivas',
+                        data: [posTrain, posVal, posTest],
+                        backgroundColor: '#28a745',
+                        borderColor: '#1e7e34',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Negativas',
+                        data: [negTrain, negVal, negTest],
+                        backgroundColor: '#dc3545',
+                        borderColor: '#bd2130',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'x',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { padding: 15, font: { size: 12 } }
+                    }
+                }
+            }
+        });
     }
 
     /**
@@ -526,107 +721,345 @@
             return;
         }
 
-        const source = document.getElementById('prediction-source')?.value ?? 'val';
+        // Obtém a fonte selecionada do source card
+        let source = 'uploaded'; // padrão
+        const selectedCard = document.querySelector('.source-card.selected');
+        if (selectedCard) {
+            source = selectedCard.dataset.source;
+        }
+
         let folderPath = null;
-        if (['random', 'folder'].includes(source)) {
-            folderPath = document.getElementById('prediction-folder-path')?.value?.trim() || null;
-            if (source === 'random' && !folderPath) {
+        let uploadedFiles = [];
+        let datasetSelected = null;
+
+        // Valida entrada conforme a fonte
+        if (source === 'validation' || source === 'test') {
+            // Validação ou Teste - precisa selecionar dataset
+            datasetSelected = document.getElementById('prediction-dataset')?.value?.trim() || null;
+            if (!datasetSelected) {
+                showLog(`Selecione um dataset para ${source === 'validation' ? 'validação' : 'teste'}`);
+                document.getElementById('prediction-dataset')?.focus();
+                return;
+            }
+            // Path será construído: custom/datasets_custom/{dataset}/val ou /test
+            folderPath = `custom/datasets_custom/${datasetSelected}/${source === 'validation' ? 'val' : 'test'}`;
+        } else if (source === 'uploaded') {
+            // Dataset customizado padrão
+            folderPath = 'predictions_images/images_default';
+        } else if (source === 'folder') {
+            // Pasta específica - aceita caminho absoluto ou relativo
+            const inputPath = document.getElementById('prediction-folder-path')?.value?.trim() || null;
+            if (!inputPath) {
                 showLog('Informe o caminho da pasta');
                 document.getElementById('prediction-folder-path')?.focus();
                 return;
             }
+            folderPath = normalizeServerPath(inputPath);
+        } else if (source === 'upload') {
+            // Upload de imagens
+            const uploadFilesInput = document.getElementById('prediction-upload-files');
+            if (uploadFilesInput && uploadFilesInput.files.length > 0) {
+                uploadedFiles = Array.from(uploadFilesInput.files);
+            } else {
+                showLog('Nenhuma imagem selecionada para upload');
+                document.getElementById('prediction-upload-files')?.focus();
+                return;
+            }
+            folderPath = 'predictions_images/images_upload';
         }
 
         showLog(`Enviando predição para: ${selected.join(', ')}`);
-        const payload = { models: selected, options: {} };
-        if (folderPath) payload.options.path = folderPath;
-
-        console.log('[DEBUG] Payload enviado:', JSON.stringify(payload, null, 2));
 
         const runBtn = document.getElementById('run-prediction-btn');
         if (runBtn) { runBtn.disabled = true; runBtn.textContent = '⏳ Executando...'; }
 
-        // Supondo que window.API.postPredict existe e retorna { results_summary: { modelName: { images: [...] } } }
-        // Se a API não estiver disponível (mock), o código de fallback window.Finder.findImagesForModel(model) será executado
-        let res = await window.API.postPredict(payload).catch(e => {
-            console.error('API de predição falhou', e);
-            showLog('Erro: API de predição não respondeu ou retornou erro. Veja console/network para detalhes.');
-            return null;
-        });
+        let res;
 
-        if (runBtn) { runBtn.disabled = false; runBtn.textContent = '▶️ Executar Predição'; }
+        // Se tem upload, envia como FormData
+        if (uploadedFiles.length > 0) {
+            console.log('[DEBUG] Enviando com FormData (upload de arquivos)');
+            const formData = new FormData();
+
+            // Adiciona modelos
+            formData.append('models', JSON.stringify(selected));
+            formData.append('source', 'upload');
+
+            // Adiciona os arquivos
+            uploadedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            // Envia FormData
+            try {
+                const response = await fetch(`${window.API.API_BASE}/predict/run`, {
+                    method: 'POST',
+                    body: formData
+                });
+                res = await response.json();
+                if (!response.ok) {
+                    throw new Error(res.detail || 'Erro na predição');
+                }
+            } catch (e) {
+                console.error('Erro no upload:', e);
+                showLog(`Erro: ${e.message}`);
+                if (runBtn) { runBtn.disabled = false; runBtn.textContent = '▶️ Iniciar Processamento de Predição'; }
+                return;
+            }
+        } else {
+            // Envia JSON normal
+            const payload = { models: selected, options: {} };
+
+            // Define o path baseado na fonte
+            if (folderPath) {
+                // Garante formato relativo sem ./
+                if (folderPath.startsWith('./')) {
+                    folderPath = folderPath.substring(2);
+                }
+                payload.options.path = folderPath;
+            }
+
+            // Indica o tipo de predição/validação/teste
+            if (source === 'validation') {
+                payload.options.split = 'val';
+            } else if (source === 'test') {
+                payload.options.split = 'test';
+            } else {
+                payload.options.split = 'predict';
+            }
+
+            if (source) payload.source = source;
+
+            console.log('[DEBUG] Payload enviado:', JSON.stringify(payload, null, 2));
+
+            res = await window.API.postPredict(payload).catch(e => {
+                console.error('API de predição falhou', e);
+                showLog('Erro: API de predição não respondeu ou retornou erro. Veja console/network para detalhes.');
+                return null;
+            });
+        }
+
+        if (runBtn) { runBtn.disabled = false; runBtn.textContent = '▶️ Iniciar Processamento de Predição'; }
         if (!res) return;
 
         const container = document.getElementById('prediction-results');
         if (!container) return;
         container.innerHTML = '';
 
-        const imagesToCompare = {}; // Declarar FORA do try-catch para evitar erro de escopo
         try {
-            // Chave: nome_do_arquivo.ext
+            const resultsContainer = document.createElement('div');
+            resultsContainer.style.cssText = `display: flex; flex-direction: column; gap: 24px;`;
 
-            for (const model of selected) {
-                let modelImages = [];
-                if (res?.results_summary?.[model]?.images) {
-                    modelImages = res.results_summary[model].images;
-                } else {
-                    // Fallback para o Finder se a API falhar ou não retornar a estrutura esperada
-                    modelImages = await window.Finder.findImagesForModel(model).catch(() => []);
+            let totalImages = 0;
+
+            // Processa cada modelo retornado pelo backend (não usa 'selected' pois os nomes podem diferir)
+            console.log('[DEBUG] results_summary:', res?.results_summary);
+            const returnedModels = Object.keys(res?.results_summary || {});
+            console.log('[DEBUG] Modelos retornados pelo backend:', returnedModels);
+
+            for (const modelName of returnedModels) {
+                const modelData = res.results_summary[modelName];
+                console.log(`[DEBUG] Processando modelo: ${modelName}`, modelData);
+
+                if (!modelData) {
+                    console.warn(`[DEBUG] Modelo ${modelName} não tem dados`);
+                    continue;
                 }
 
-                modelImages.forEach(imageUrl => {
-                    const imageKey = imageUrl.split('/').pop();
-                    if (!imagesToCompare[imageKey]) {
-                        imagesToCompare[imageKey] = { models: [] };
+                // Detecta se tem estrutura com subfolders (nova) ou imagens diretas (antiga)
+                const hasSubfolders = modelData.subfolders && typeof modelData.subfolders === 'object' && Object.keys(modelData.subfolders).length > 0;
+                console.log(`[DEBUG] ${modelName} hasSubfolders: ${hasSubfolders}`);
+
+                if (hasSubfolders) {
+                    console.log(`[DEBUG] Subfolders:`, Object.keys(modelData.subfolders));
+
+                    // Nova estrutura: subpastas com imagens
+                    const modelSection = document.createElement('div');
+                    modelSection.style.cssText = `display: flex; flex-direction: column; gap: 16px;`;
+
+                    // Cabeçalho do modelo
+                    const modelHeader = document.createElement('div');
+                    modelHeader.style.cssText = `font-size: 1.1rem; font-weight: 600; color: #0066cc; border-bottom: 2px solid #0066cc; padding-bottom: 8px;`;
+                    modelHeader.textContent = `📊 ${modelName}`;
+                    modelSection.appendChild(modelHeader);
+
+                    // Processa cada subpasta
+                    for (const [subfolder, subfolder_data] of Object.entries(modelData.subfolders)) {
+                        const images = subfolder_data.images || [];
+                        console.log(`[DEBUG] Subfolder ${subfolder}: ${images.length} images`);
+                        if (images.length > 0) {
+                            console.log(`[DEBUG] Primeira imagem:`, images[0]);
+                        }
+
+                        if (images.length === 0) continue;
+
+                        // Cabeçalho da subpasta
+                        const subfolderHeader = document.createElement('div');
+                        subfolderHeader.style.cssText = `
+                            font-size: 1rem; 
+                            font-weight: 600; 
+                            color: #444; 
+                            padding: 8px 12px; 
+                            background: var(--surface); 
+                            border-left: 3px solid #28a745; 
+                            border-radius: 4px;
+                            margin-top: 12px;
+                        `;
+                        subfolderHeader.innerHTML = `📁 ${subfolder} <span style="color: #999; font-size: 0.9rem;">(${images.length} imagens)</span>`;
+                        modelSection.appendChild(subfolderHeader);
+
+                        // Grid de imagens para esta subpasta
+                        const imagesGrid = document.createElement('div');
+                        imagesGrid.style.cssText = `
+                            display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                            gap: 12px;
+                            padding: 12px;
+                            background: #f9f9f9;
+                            border-radius: 8px;
+                        `;
+
+                        for (const imageUrl of images) {
+                            const imageCard = document.createElement('div');
+                            imageCard.className = 'image-card';  // Adiciona classe para modal navigation
+                            imageCard.style.cssText = `
+                                background: white;
+                                border-radius: 8px;
+                                overflow: hidden;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                                transition: transform 0.2s ease, box-shadow 0.2s ease;
+                                cursor: pointer;
+                            `;
+                            imageCard.onmouseover = () => {
+                                imageCard.style.transform = 'translateY(-4px)';
+                                imageCard.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+                            };
+                            imageCard.onmouseout = () => {
+                                imageCard.style.transform = 'translateY(0)';
+                                imageCard.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+                            };
+
+                            const imgElement = document.createElement('img');
+                            imgElement.src = imageUrl;
+                            imgElement.alt = `${modelName} - ${subfolder}`;
+                            imgElement.style.cssText = `
+                                width: 100%;
+                                height: 180px;
+                                object-fit: cover;
+                                display: block;
+                                border-radius: 6px 6px 0 0;
+                            `;
+                            imgElement.onclick = () => UI.openImageModal(imageUrl, `${modelName} - ${subfolder}`);
+
+                            const imgCaption = document.createElement('div');
+                            imgCaption.style.cssText = `
+                                padding: 8px;
+                                font-size: 0.85rem;
+                                color: #666;
+                                border-top: 1px solid #eee;
+                                overflow: hidden;
+                                text-overflow: ellipsis;
+                                white-space: nowrap;
+                            `;
+                            imgCaption.textContent = imageUrl.split('/').pop();
+
+                            imageCard.appendChild(imgElement);
+                            imageCard.appendChild(imgCaption);
+                            imagesGrid.appendChild(imageCard);
+                            totalImages++;
+                        }
+
+                        modelSection.appendChild(imagesGrid);
                     }
-                    imagesToCompare[imageKey].models.push({
-                        name: model,
-                        url: imageUrl,
-                    });
-                });
-            }
 
-            const imageKeys = Object.keys(imagesToCompare);
+                    resultsContainer.appendChild(modelSection);
+                } else if (modelData.images && Array.isArray(modelData.images)) {
+                    // Estrutura antiga: imagens diretas (fallback)
+                    const modelSection = document.createElement('div');
+                    modelSection.style.cssText = `display: flex; flex-direction: column; gap: 16px;`;
 
-            if (imageKeys.length === 0) {
-                container.innerHTML = `<div class="card">Nenhuma imagem de confusão encontrada para os modelos selecionados.</div>`;
-                return;
-            }
+                    const modelHeader = document.createElement('div');
+                    modelHeader.style.cssText = `font-size: 1.1rem; font-weight: 600; color: #0066cc; border-bottom: 2px solid #0066cc; padding-bottom: 8px;`;
+                    modelHeader.textContent = `📊 ${modelName}`;
+                    modelSection.appendChild(modelHeader);
 
-            for (const imageKey of imageKeys) {
-                const imageGroup = imagesToCompare[imageKey];
-                const groupDiv = document.createElement('div');
-                groupDiv.className = 'model-result image-comparison-group card';
-
-                groupDiv.innerHTML = `<h4 style="margin-bottom:10px;font-weight:700">🖼️ Comparação da Imagem: ${imageKey}</h4>`;
-
-                const comparisonGrid = document.createElement('div');
-                comparisonGrid.className = 'comparison-grid' + (imageGroup.models.length > 2 ? ' comparison-grid-cols-3' : ' comparison-grid-cols-2');
-
-                for (const prediction of imageGroup.models) {
-                    const modelCard = document.createElement('div');
-                    modelCard.className = 'comparison-card';
-
-                    modelCard.innerHTML = `
-                        <div class="model-name-label">Modelo: <strong>${prediction.name}</strong></div>
-                        <div class="card image-card">
-                            <img src="${prediction.url}" alt="Predição de ${prediction.name} para ${imageKey}" 
-                                onclick="UI.openImageModal(this.src, this.alt)"/>
-                        </div>
+                    const imagesGrid = document.createElement('div');
+                    imagesGrid.style.cssText = `
+                        display: grid;
+                        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                        gap: 12px;
+                        padding: 12px;
+                        background: #f9f9f9;
+                        border-radius: 8px;
                     `;
-                    comparisonGrid.appendChild(modelCard);
-                }
 
-                groupDiv.appendChild(comparisonGrid);
-                container.appendChild(groupDiv);
+                    for (const imageUrl of modelData.images) {
+                        const imageCard = document.createElement('div');
+                        imageCard.className = 'image-card';  // Adiciona classe para modal navigation
+                        imageCard.style.cssText = `
+                            background: white;
+                            border-radius: 8px;
+                            overflow: hidden;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                            transition: transform 0.2s ease, box-shadow 0.2s ease;
+                            cursor: pointer;
+                        `;
+                        imageCard.onmouseover = () => {
+                            imageCard.style.transform = 'translateY(-4px)';
+                            imageCard.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
+                        };
+                        imageCard.onmouseout = () => {
+                            imageCard.style.transform = 'translateY(0)';
+                            imageCard.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+                        };
+
+                        const imgElement = document.createElement('img');
+                        imgElement.src = imageUrl;
+                        imgElement.alt = `${modelName}`;
+                        imgElement.style.cssText = `
+                            width: 100%;
+                            height: 180px;
+                            object-fit: cover;
+                            display: block;
+                            border-radius: 6px 6px 0 0;
+                        `;
+                        imgElement.onclick = () => UI.openImageModal(imageUrl, modelName);
+
+                        const imgCaption = document.createElement('div');
+                        imgCaption.style.cssText = `
+                            padding: 8px;
+                            font-size: 0.85rem;
+                            color: #666;
+                            border-top: 1px solid #eee;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            white-space: nowrap;
+                        `;
+                        imgCaption.textContent = imageUrl.split('/').pop();
+
+                        imageCard.appendChild(imgElement);
+                        imageCard.appendChild(imgCaption);
+                        imagesGrid.appendChild(imageCard);
+                        totalImages++;
+                    }
+
+                    modelSection.appendChild(imagesGrid);
+                    resultsContainer.appendChild(modelSection);
+                }
             }
+
+            if (totalImages === 0) {
+                container.innerHTML = `<div class="card" style="padding: 20px; text-align: center; color: #999;">📭 Nenhuma imagem encontrada nos resultados da predição.</div>`;
+            } else {
+                container.appendChild(resultsContainer);
+            }
+
+            showLog(`✅ Predição concluída! ${totalImages} imagem(ns) processada(s).`);
 
         } catch (e) {
-            console.error('Error rendering prediction results', e);
-            showLog('Erro ao renderizar resultados. Veja console/debug output.');
+            console.error('Erro ao renderizar resultados de predição:', e);
+            showLog(`❌ Erro ao renderizar resultados: ${e.message}`);
+            container.innerHTML = `<div class="card" style="padding: 20px; color: #d9534f;">Erro ao processar resultados da predição. Veja console para detalhes.</div>`;
         }
-
-        showLog(`Predição concluída. Imagens comparadas: ${Object.keys(imagesToCompare).length}.`);
     }
 
     // --- FUNÇÕES DE STREAMING/LOG ---
@@ -1217,6 +1650,12 @@
 
                 // 3. Chamada inicial para preencher o resumo
                 updateNegativeSummary();
+
+                // 4. Garante que os gráficos sejam atualizados após Chart.js estar pronto
+                setTimeout(() => {
+                    console.log('[bindPageHandlers] Chamando updateNegativeSummary com delay para garantir Chart.js');
+                    updateNegativeSummary();
+                }, 500);
             }
 
             // INICIALIZAÇÃO: Esta chamada garante que o JS entre em ação ao carregar a página.
@@ -1284,6 +1723,14 @@
                     setTimeout(() => { cb.dispatchEvent(new Event('change')); }, 10);
                 });
 
+                // clicking anywhere on the item should toggle the checkbox
+                item.addEventListener('click', (e) => {
+                    // avoid double-toggle if clicking on checkbox or label directly
+                    if (e.target === cb || e.target === lbl) return;
+                    cb.checked = !cb.checked;
+                    cb.dispatchEvent(new Event('change'));
+                });
+
                 // assemble
                 const leftWrap = document.createElement('div');
                 leftWrap.style.display = 'flex';
@@ -1318,19 +1765,114 @@
             updateSelectedSummary();
         }
 
-        // controla a visibilidade do input de pasta conforme a opção escolhida
+        // controla a visibilidade dos inputs conforme o source card
         function updateFolderInputVisibility() {
-            const src = document.getElementById('prediction-source');
+            const datasetSelect = document.getElementById('prediction-dataset-select');
             const folderInput = document.getElementById('prediction-folder-input');
-            if (!src || !folderInput) return;
-            const v = src.value;
-            if (v === 'random' || v === 'folder') folderInput.classList.remove('hidden'); else folderInput.classList.add('hidden');
+            const uploadInput = document.getElementById('prediction-upload-input');
+            const sourceCards = document.querySelectorAll('.source-card');
+
+            // Encontra qual card está selecionado
+            let selectedSource = null;
+            sourceCards.forEach(card => {
+                if (card.classList.contains('selected')) {
+                    selectedSource = card.dataset.source;
+                }
+            });
+
+            // Mostra os inputs apropriados baseado no source
+            if (datasetSelect) {
+                if (selectedSource === 'validation' || selectedSource === 'test') {
+                    datasetSelect.classList.remove('hidden');
+                } else {
+                    datasetSelect.classList.add('hidden');
+                }
+            }
+
+            if (folderInput) {
+                if (selectedSource === 'folder') {
+                    folderInput.classList.remove('hidden');
+                } else {
+                    folderInput.classList.add('hidden');
+                }
+            }
+
+            if (uploadInput) {
+                if (selectedSource === 'upload') {
+                    uploadInput.classList.remove('hidden');
+                } else {
+                    uploadInput.classList.add('hidden');
+                }
+            }
+        }
+
+        // Carrega datasets disponíveis para validação/teste
+        async function loadDatasetsForPrediction() {
+            const select = document.getElementById('prediction-dataset');
+            if (!select) return;
+
+            try {
+                const datasets = await window.API.getDatasets();
+                if (!datasets || datasets.length === 0) {
+                    select.innerHTML = '<option value="">Nenhum dataset encontrado</option>';
+                    return;
+                }
+
+                select.innerHTML = '<option value="">-- Selecione um dataset --</option>';
+                datasets.forEach(dataset => {
+                    const option = document.createElement('option');
+                    option.value = dataset;
+                    option.textContent = dataset;
+                    select.appendChild(option);
+                });
+            } catch (e) {
+                console.warn('[UI] Erro ao carregar datasets:', e);
+                select.innerHTML = '<option value="">Erro ao carregar datasets</option>';
+            }
         }
 
         // inicialização da tela de predição
         loadModelsIntoContainer().catch(e => console.warn('Falha ao carregar modelos:', e));
-        document.getElementById('prediction-source')?.addEventListener('change', updateFolderInputVisibility);
-        updateFolderInputVisibility();
+        loadDatasetsForPrediction().catch(e => console.warn('Falha ao carregar datasets:', e));
+
+        // Wire source cards
+        const sourceCards = document.querySelectorAll('.source-card');
+        sourceCards.forEach(card => {
+            card.addEventListener('click', (e) => {
+                // Remove seleção anterior
+                sourceCards.forEach(c => c.classList.remove('selected'));
+                // Adiciona seleção ao card clicado
+                card.classList.add('selected');
+                // Atualiza visibilidade do input e summary
+                updateFolderInputVisibility();
+                updateSelectedSummary();
+            });
+        });
+
+        // Wire file upload input
+        const uploadFilesInput = document.getElementById('prediction-upload-files');
+        if (uploadFilesInput) {
+            uploadFilesInput.addEventListener('change', (e) => {
+                const filesList = document.getElementById('uploaded-files-list');
+                const filesDisplay = document.getElementById('uploaded-files-display');
+                const files = Array.from(e.target.files);
+
+                if (files.length > 0) {
+                    const fileNames = files.map(f => `<div style="margin-bottom: 4px;">✓ ${f.name}</div>`).join('');
+                    filesDisplay.innerHTML = fileNames;
+                    filesList.style.display = 'block';
+                    updateSelectedSummary();
+                } else {
+                    filesList.style.display = 'none';
+                }
+            });
+        }
+
+        // Inicializa com "uploaded" selecionado por padrão
+        if (sourceCards.length > 0) {
+            sourceCards[0].classList.add('selected');
+            updateFolderInputVisibility();
+        }
     }
 
     // --- EXPOSIÇÃO GLOBAL ---
@@ -1374,6 +1916,7 @@
         collectTrainingPayload,
         openImageModal,
         updateNegativeSummary,
+        updateDatasetGraphs,
     };
 
 })(window);

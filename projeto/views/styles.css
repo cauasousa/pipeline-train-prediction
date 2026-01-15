@@ -74,14 +74,57 @@ body {
     overflow-y: auto;
     transition: margin-left .25s ease, margin-right .25s ease;
     z-index: 1;
-    background: transparent;
+    background: #f6f8fb;
     color: var(--text-primary);
+}
+
+/* Section Headers (Etapas) */
+.section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 20px 0 10px;
+}
+
+.section-step {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #0066cc;
+    background: rgba(0, 102, 204, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.section-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
 }
 
 .card-section {
     margin-bottom: 10px;
     padding: 2px;
-    /* Aumenta o padding interno para organização */
+}
+
+/* Card refinado */
+.card {
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Summary Card (Resumo do Dataset) */
+.summary-card {
+    border-left: 4px solid #0066cc;
+}
+
+.summary-card h3 {
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
 }
 
 /* --- Estilos para Comparação Lado a Lado --- */
@@ -170,6 +213,62 @@ body {
     border-radius: 8px;
     padding: 12px;
     box-sizing: border-box;
+}
+
+
+
+
+/* Estilizacao para os itens de modelo que o ui.js cria dinamicamente */
+.model-item-compact {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px !important;
+    margin: 0 !important;
+    border: 1px solid #e1e4e8 !important;
+    border-radius: 6px !important;
+    background: white !important;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.model-item-compact:hover {
+    border-color: #0066cc !important;
+    background: #f0f7ff !important;
+}
+
+.model-item-compact.selected {
+    border-color: #0066cc !important;
+    background: #e6f0ff !important;
+    box-shadow: 0 2px 4px rgba(0, 102, 204, 0.1);
+}
+
+.model-item-compact input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+/* Ajuste na grid de resultados para comparacao lado a lado */
+.comparison-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 15px;
+}
+
+.comparison-grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.comparison-grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 768px) {
+
+    .comparison-grid-cols-2,
+    .comparison-grid-cols-3 {
+        grid-template-columns: 1fr;
+    }
 }
 
 .training-images-area .image-comparison-group {
@@ -374,18 +473,6 @@ label input[type="radio"] {
 
 .icon-accent {
     color: var(--color-accent);
-}
-
-
-
-/* Sua classe .card existente é mantida */
-.card {
-    background: var(--surface);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    padding: 15px;
-    border-radius: 12px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
 }
 
 /* Novo Estilo Específico para o Resumo */
@@ -630,6 +717,19 @@ textarea#logs {
         width: var(--sidebar-collapsed-width);
     }
 
+    /* Esconde textos do menu em telas pequenas para evitar overflow quando a sidebar retrai */
+    .sidebar .menu-item span {
+        display: none;
+    }
+
+    .sidebar .menu-item {
+        justify-content: center;
+    }
+
+    .sidebar .menu-item i {
+        margin-right: 0;
+    }
+
     .main-content {
         margin-left: var(--sidebar-collapsed-width);
         margin-right: 0;
@@ -775,8 +875,8 @@ textarea#logs {
 
 /* Config panel styles */
 .config-card {
-    background: linear-gradient(180deg, #ffffff, #fbfdff);
-    border: 1px solid rgba(0, 0, 0, 0.04);
+    background: var(--surface);
+    border: 1px solid var(--border);
     padding: 12px;
     border-radius: 10px;
 }
@@ -931,4 +1031,82 @@ textarea#logs {
 #negative-selection-table thead th {
     font-size: 14px;
     color: var(--color-primary);
+}
+
+/* Source card selection (Imagens Upadas / Pasta Específica) */
+.source-card {
+    background: var(--surface);
+    border-color: #97a8bd !important;
+}
+
+.source-card:hover {
+    border-color: #b7c2cc !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.source-card.selected {
+    background: #d0e4ff !important;
+    border-color: #0066cc !important;
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.15);
+}
+
+/* File input styling for image upload */
+#prediction-upload-files {
+    cursor: pointer;
+    padding: 12px !important;
+}
+
+#prediction-upload-files::file-selector-button {
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    margin-right: 10px;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+#prediction-upload-files::file-selector-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 102, 204, 0.2);
+}
+
+#uploaded-files-list {
+    background: #f0f7ff;
+    border: 1px solid #cce5ff;
+}
+
+/* KPI Cards (Dashboard) */
+.kpi-card {
+    padding: 10px;
+    text-align: center;
+    border-left: 3px solid;
+}
+
+.kpi-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.kpi-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.kpi-total {
+    border-color: #0066cc;
+    color: #0066cc;
+}
+
+.kpi-positive {
+    border-color: #28a745;
+    color: #28a745;
+}
+
+.kpi-negative {
+    border-color: #dc3545;
+    color: #dc3545;
 }

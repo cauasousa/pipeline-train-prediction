@@ -1,11 +1,14 @@
 <div class="section" id="training-page">
-    <h2>🧠 Treinamento</h2>
+    <!-- <h2>Treinamento</h2> -->
 
-    <hr style="margin: 15px 0;">
+    <div class="section-header">
+        <span class="section-step">ETAPA 1</span>
+        <h3>Seleção do Dataset</h3>
+    </div>
 
     <div class="card" style="margin-bottom: 20px;">
         <div class="form-group">
-            <label><strong>1. Seleção de Dataset (Positivo)</strong></label>
+            <label><strong>Dataset Positivo</strong></label>
             <div style="display:flex; gap: 10px; align-items: center;">
                 <select id="dataset-select" class="input" style="flex-grow: 1;"></select>
                 <button class="btn" id="upload-dataset-btn" style="flex-shrink: 0;">📁 Upload Pasta</button>
@@ -13,10 +16,13 @@
         </div>
     </div>
 
-    <div class="card config-card" style="margin-bottom: 20px;">
-        <label><strong>2. Divisão e Configuração do Conjunto de Dados</strong></label>
+    <div class="section-header">
+        <span class="section-step">ETAPA 2</span>
+        <h3>Divisão e Configuração do Conjunto de Dados</h3>
+    </div>
 
-        <h4 style="margin-top:15px; margin-bottom:5px;">2a. Divisão da Classe Positiva (Upload)</h4>
+    <div class="card config-card" style="margin-bottom: 20px;">
+        <h4 style="margin-top:5px; margin-bottom:5px;">Divisão da Classe Positiva</h4>
         <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom: 10px;">
             Ajuste as proporções de treino, validação e teste (Total = 100%).
         </p>
@@ -37,7 +43,7 @@
 
         <hr style="margin:20px 0;">
 
-        <h4 style="margin-bottom:10px;">2b. Dados de Negativos (Seleção por Linha)</h4>
+        <h4 style="margin-bottom:10px;">Dados de Negativos (Seleção por Linha)</h4>
         <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom: 15px;">Selecione e defina a
             quantidade de imagens para a classe negativa (<code>negativo</code>), por tipo ou linha específica.</p>
 
@@ -71,7 +77,7 @@
                         </tr>
                         <tr class="line-detail-row hidden" data-parent="Cone">
                             <td colspan="4" style="padding: 0;">
-                                <div class="line-detail-panel" style="background:#E9ECF1; padding: 15px;">
+                                <div class="line-detail-panel" style="background:var(--surface); padding: 15px;">
 
                                     <div class="line-detail-actions"
                                         style="display:flex;justify-content:space-between;align-items:center;margin-bottom: 10px;">
@@ -80,7 +86,7 @@
                                     </div>
 
                                     <div class="mode-options-group"
-                                        style="display: flex; gap: 20px; margin-bottom: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff;">
+                                        style="display: flex; gap: 20px; margin-bottom: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: white;">
                                         <label style="display: flex; align-items: center; gap: 5px;">
                                             <input type="radio" name="mode-Cone" value="random" checked
                                                 onchange="global.UI.setNegativeSelectionMode('Cone', 'random')">
@@ -105,7 +111,7 @@
                                     </div>
 
                                     <div class="line-detail-grid line-select-panel" data-type="Cone"
-                                        style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: #fff;">
+                                        style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: white;">
                                     </div>
 
                                 </div>
@@ -128,7 +134,7 @@
                         </tr>
                         <tr class="line-detail-row hidden" data-parent="Hex Externo">
                             <td colspan="4" style="padding: 0;">
-                                <div class="line-detail-panel" style="background:#E9ECF1; padding: 15px;">
+                                <div class="line-detail-panel" style="background:var(--surface); padding: 15px;">
 
                                     <div class="line-detail-actions"
                                         style="display:flex;justify-content:space-between;align-items:center;margin-bottom: 10px;">
@@ -137,7 +143,7 @@
                                     </div>
 
                                     <div class="mode-options-group"
-                                        style="display: flex; gap: 20px; margin-bottom: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff;">
+                                        style="display: flex; gap: 20px; margin-bottom: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: white;">
                                         <label style="display: flex; align-items: center; gap: 5px;">
                                             <input type="radio" name="mode-Hex Externo" value="random" checked
                                                 onchange="global.UI.setNegativeSelectionMode('Hex Externo', 'random')">
@@ -162,7 +168,7 @@
                                     </div>
 
                                     <div class="line-detail-grid line-select-panel" data-type="Hex Externo"
-                                        style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: #fff;">
+                                        style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: white;">
                                     </div>
                                 </div>
                             </td>
@@ -184,7 +190,7 @@
                         </tr>
                         <tr class="line-detail-row hidden" data-parent="Hex Interno">
                             <td colspan="4" style="padding: 0;">
-                                <div class="line-detail-panel" style="background:#E9ECF1; padding: 15px;">
+                                <div class="line-detail-panel" style="background:var(--surface); padding: 15px;">
 
                                     <div class="line-detail-actions"
                                         style="display:flex;justify-content:space-between;align-items:center;margin-bottom: 10px;">
@@ -193,7 +199,7 @@
                                     </div>
 
                                     <div class="mode-options-group"
-                                        style="display: flex; gap: 20px; margin-bottom: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff;">
+                                        style="display: flex; gap: 20px; margin-bottom: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: white;">
                                         <label style="display: flex; align-items: center; gap: 5px;">
                                             <input type="radio" name="mode-Hex Interno" value="random" checked
                                                 onchange="global.UI.setNegativeSelectionMode('Hex Interno', 'random')">
@@ -218,7 +224,7 @@
                                     </div>
 
                                     <div class="line-detail-grid line-select-panel" data-type="Hex Interno"
-                                        style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: #fff;">
+                                        style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: white;">
                                     </div>
                                 </div>
                             </td>
@@ -240,60 +246,67 @@
             </div>
         </div>
 
-        <div class="card" style="margin-top:15px;">
-            <h3 style="margin: 0 0 10px 0; color: var(--text-primary);">
-                📊 Resumo do Conjunto de Dados (Estimativa)
-            </h3>
+        <!-- Hidden elements para armazenar dados (usados pelo JavaScript) -->
+        <div id="total-positive-count" style="display:none;">1000</div>
+        <div id="total-negative-count" style="display:none;">0</div>
+        <div id="total-all" style="display:none;">1000</div>
+        <div id="positive-split" style="display:none;">700 / 200 / 100</div>
+        <div id="negative-split" style="display:none;">0 / 0 / 0</div>
+        <div id="total-split" style="display:none;">700 / 200 / 100</div>
 
-            <ul id="dataset-summary" class="dataset-summary-list">
+    </div>
 
-                <li>
-                    <div style="display: flex; align-items: center;">
-                        <span class="data-icon" style="color: #28a745;">&#10003;</span> Total de imagens Positivas
-                        (Upload)
-                    </div>
-                    <span id="total-positive-count" class="total-positive">1000</span>
-                </li>
+    <div class="card summary-card" style="margin-bottom: 20px; padding: 15px;">
+        <h3>📊 Resumo do Dataset</h3>
 
-                <li>
-                    <div style="display: flex; align-items: center;">
-                        <span class="data-icon" style="color: #dc3545;">&#10005;</span> Total de imagens Negativas
-                        (Selecionadas)
-                    </div>
-                    <span id="total-negative-count" class="total-negative">0</span>
-                </li>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:15px 0;">
 
-                <li class="total-highlight">
-                    Total Geral Estimado
-                    <span id="total-all" class="total-all">1000</span>
-                </li>
-                <li class="">
-                    <div style="display: flex; align-items: center;">
-                        <span class="data-icon" style="color: var(--text-secondary);">&#9679;</span> Divisão Positivos
-                        Train/Val/Test
-                    </div>
-                    <span id="positive-split">0 / 0 / 0</span>
-                </li>
-                <li class="">
-                    <div style="display: flex; align-items: center;">
-                        <span class="data-icon" style="color: var(--text-secondary);">&#9679;</span> Divisão Negativos
-                        Train/Val/Test
-                    </div>
-                    <span id="negative-split">0 / 0 / 0</span>
-                </li>
-                <li>
-                    <div style="display: flex; align-items: center;">
-                        <span class="data-icon" style="color: var(--text-secondary);">&#9679;</span> Divisão total
-                        Train/Val/Test
-                    </div>
-                    <span id="total-split">700 / 200 / 100</span>
-                </li>
-            </ul>
+            <div class="card kpi-card kpi-total">
+                <div class="kpi-label">Total</div>
+                <div class="kpi-value" id="kpi-total">0</div>
+            </div>
+
+            <div class="card kpi-card kpi-positive">
+                <div class="kpi-label">Positivas</div>
+                <div class="kpi-value" id="kpi-positive">0</div>
+            </div>
+
+            <div class="card kpi-card kpi-negative">
+                <div class="kpi-label">Negativas</div>
+                <div class="kpi-value" id="kpi-negative">0</div>
+            </div>
+
         </div>
+
+        <!-- Gráficos -->
+        <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px;">
+            <!-- Gráfico 1: Donut (Positivo vs Negativo) -->
+            <div class="card" style="padding: 15px;">
+                <h4 style="margin: 0 0 15px 0; font-size: 1rem;">📊 Proporção Positivo vs Negativo</h4>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chart-proportion"></canvas>
+                </div>
+            </div>
+
+            <!-- Gráfico 2: Barras Empilhadas (Train/Val/Test Total) -->
+            <div class="card" style="padding: 15px;">
+                <h4 style="margin: 0 0 15px 0; font-size: 1rem;">📈 Distribuição Train/Val/Test (Empilhado)</h4>
+                <div style="position: relative; height: 250px;">
+                    <canvas id="chart-stacked-bars"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="dataset-balance-alert" style="display:none;"></div>
+    </div>
+
+    <div class="section-header">
+        <span class="section-step">ETAPA 3</span>
+        <h3>Tipos de Pré-Processamento</h3>
     </div>
 
     <div class="card config-card" style="margin-bottom: 20px;">
-        <label><strong>3. Tipos de Pré-Processamento</strong></label>
         <p style="font-size:0.9rem; color:var(--text-muted)">Selecione as técnicas de aumento/transformação.
         </p>
         <div id="tipo-checkboxes-preprocessing" style="display:flex; flex-wrap:wrap; gap:10px;">
@@ -303,9 +316,14 @@
         </div>
     </div>
 
-    <div id="config-panel" class="card config-card mt-4">
+    <div class="section-header">
+        <span class="section-step">ETAPA 4</span>
+        <h3>⚙️ Configuração de Treino (YOLO)</h3>
+    </div>
+
+    <div id="config-panel" class="card config-card">
         <div class="config-header" style="display:flex;justify-content:space-between;align-items:center">
-            <strong>4. ⚙️ Configuração de Treino (YOLO)</strong>
+            <span style="font-size:0.9rem;color:var(--text-muted);">Ajuste os parâmetros de treinamento</span>
             <div>
                 <button id="reset-config-btn" class="btn btn-success" title="Restaurar padrão">Restaurar</button>
                 <button id="edit-config-btn" class="btn" title="Editar configuração">Editar</button>
@@ -335,7 +353,10 @@
         <div id="progress-fill" class="progress-fill"></div>
     </div>
 
-    <h3>Log de Treinamento</h3>
+    <h3 style="margin-top:20px;">🧪 Log de Treinamento</h3>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">
+        Acompanhe o progresso e mensagens do processo em tempo real.
+    </p>
 
     <textarea id="logs" readonly
         style="margin-top:12px; background: #1e1e1e; color: #00ff00; height: 450px; overflow-y: scroll; padding: 10px; border-radius: 5px;"></textarea>

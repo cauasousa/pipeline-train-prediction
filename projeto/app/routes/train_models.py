@@ -58,13 +58,15 @@ def function_test_yolo(model_paths=None, dataset_path=None, split="val", project
             m = YOLO(mp)
             model_basename = os.path.basename(mp)
             # Se output_dir for fornecido, usar como project; caso contrário, usar project_name
+            print("AQUI")
             if output_dir:
                 # YOLO cria: output_dir/runs/classify/model_basename/
                 # Nós queremos: output_dir/model_basename/
-                r = m.val(data=dataset_path, split=split, project=str(output_dir), name=model_basename, save=True)
+                r = m.predict(source=dataset_path, split=split, project=str(output_dir), name=model_basename, save=True, )
             else:
-                r = m.val(data=dataset_path, split=split, project=project_name, name=model_basename, save=True)
+                r = m.predict(source=dataset_path, split=split, project=project_name, name=model_basename, save=True, )
             results[model_basename] = r
+            print(dataset_path, ' Este foi o dataset path')
     else:
         for mp in model_paths:
             name = os.path.basename(mp)

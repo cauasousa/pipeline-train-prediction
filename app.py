@@ -10,12 +10,17 @@ BASE_DIR = Path(__file__).resolve().parent
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}, r"/predictions/*": {"origins": "*"}, r"/*": {"origins": "*"}})
 
-# Importa workspace_root com fallback
+# Importa workspace_root e storage_models_yolo_dir com fallback
 try:
-    from projeto.app.paths import workspace_root
+    from projeto.app.paths import workspace_root, storage_models_yolo_dir, predictions_datasets_yolo_dir
 except ImportError:
+    def predictions_datasets_yolo_dir():
+        return BASE_DIR / 'predictions'
     def workspace_root():
         return BASE_DIR
+    def storage_models_yolo_dir():
+        # Fallback: assume estrutura local padrão
+        return (BASE_DIR / 'storage' / 'models_yolo').resolve()
 
 # Registrar blueprints
 try:
@@ -29,9 +34,10 @@ except Exception as e:
 
 # Paths
 project_root = BASE_DIR
-predictions_dir = (workspace_root() / "predictions").resolve()
-# Modelos podem estar em custom/models OU na raiz do projeto (yolo*.pt)
-models_storage_dir = (project_root / "custom" / "models").resolve()
+# predictions_dir = (workspace_root() / "predictions").resolve()
+# Diretório canônico de modelos YOLO vindo de paths.py
+models_yolo_storage_dir = storage_models_yolo_dir()
+predictions_dir = predictions_datasets_yolo_dir()
 
 predictions_dir.mkdir(parents=True, exist_ok=True)
 
@@ -332,32 +338,21 @@ def list_models_in_run(run_name):
 
 @app.route("/models", methods=["GET"])
 def list_models_root():
-    """Lista modelos do storage backend (custom/models) e da raiz (yolo*.pt)."""
-    models = []
+    """Lista modelos do storage canônico (storage/models_yolo) e também da raiz (yolo*.pt/pth)."""
     seen = set()
-    
-    # 1. Procura em custom/models/
-    if models_storage_dir.exists():
-        try:
-            for f in sorted(os.listdir(models_storage_dir)):
-                fpath = os.path.join(models_storage_dir, f)
-                if os.path.isfile(fpath) and f not in seen:
-                    models.append(f)
-                    seen.add(f)
-        except Exception:
-            pass
-    
-    # 2. Procura na raiz do projeto (yolo*.pt, yolo*.pth, etc)
+
+    # 1. Procura em storage/models_yolo (paths.storage_models_yolo_dir)
     try:
-        for f in sorted(os.listdir(project_root)):
-            if (f.startswith('yolo') or f.endswith('.pt') or f.endswith('.pth')) and f not in seen:
-                fpath = os.path.join(project_root, f)
-                if os.path.isfile(fpath):
-                    models.append(f)
+        base = models_yolo_storage_dir
+        if base and Path(base).exists():
+            for f in sorted(os.listdir(base)):
+                fpath = os.path.join(base, f)
+                # aceita arquivos comuns de pesos
+                if os.path.isfile(fpath) and (f.endswith('.pt') or f.endswith('.pth') or f.startswith('yolo')):
                     seen.add(f)
     except Exception:
         pass
-    
+
     return jsonify({"models": sorted(list(seen))})
 
 
