@@ -11,6 +11,7 @@ import sys
 import platform
 import signal
 import shlex
+import cv2
 from pathlib import Path
 from math import ceil
 from typing import Dict, List, Optional, Tuple
@@ -18,10 +19,123 @@ from typing import Dict, List, Optional, Tuple
 from projeto.app.paths import (
     datasets_custom_dir,
     storage_imagens_implates_dir,
+    storage_models_yolo_dir,
 )
+from projeto.app.services.preprocessing_service import apply_custom_preprocessing
 
 
 IMG_EXTENSIONS = [".jpg", ".png", ".jpeg", ".bmp", ".tiff"]
+
+
+def _copy_with_preprocessing(src_path: Path, dest_path: Path, techniques: List[str]) -> None:
+    """Copia imagem aplicando técnicas de pré-processamento.
+    
+    Args:
+        src_path: Caminho da imagem origem
+        dest_path: Caminho de destino
+        techniques: Lista de técnicas a aplicar
+    """
+    if not techniques:
+        # Se não há técnicas, copia direto
+        shutil.copy(src_path, dest_path)
+        return
+    
+    try:
+        # Lê imagem
+        img = cv2.imread(str(src_path))
+        if img is None:
+            # Fallback: copia sem processar
+            shutil.copy(src_path, dest_path)
+            return
+        
+        # Aplica técnicas
+        processed_img = apply_custom_preprocessing(img, techniques)
+        
+        # Salva imagem processada
+        cv2.imwrite(str(dest_path), processed_img)
+    except Exception as e:
+        print(f"[WARNING] Erro ao processar {src_path}: {e}. Copiando sem processamento.")
+        shutil.copy(src_path, dest_path)
+
+
+def _save_best_model(job_id: str, config: dict, log_handle) -> None:
+    """
+    Copia o melhor modelo (best.pt) para o diretório models_yolo com nome único.
+    
+    Procura pela pasta do job com o maior sufixo numérico (ex: treinamento_classificacao27)
+    e copia o best.pt de dentro dela.
+    
+    Args:
+        job_id: ID do job (usado como base do nome do modelo)
+        config: Configuração YOLO (contém project)
+        log_handle: Handle do arquivo de log para escrever mensagens
+    """
+    project = config.get('project', 'yolo_classificacao_resultados')
+    project_path = Path(project)
+    
+    if not project_path.exists():
+        log_handle.write(f"\n[AVISO] Diretório do projeto não encontrado: {project_path}\n")
+        return
+    
+    # Procura por pastas que começam com job_id (para encontrar job_idN, job_idN+1, etc)
+    candidate_folders = [
+        d for d in project_path.iterdir()
+        if d.is_dir() and d.name.startswith(job_id)
+    ]
+    
+    if not candidate_folders:
+        log_handle.write(f"\n[AVISO] Nenhuma pasta encontrada para job '{job_id}' em {project_path}\n")
+        return
+    
+    # Encontra a pasta com o maior sufixo numérico
+    def get_suffix_num(path_obj):
+        name = path_obj.name
+        if name == job_id:
+            return 0
+        # Extrai apenas os números após o nome base
+        suffix = name[len(job_id):]
+        return int(suffix) if suffix.isdigit() else 0
+    
+    latest_job_dir = max(candidate_folders, key=get_suffix_num)
+    log_handle.write(f"\n[INFO] Pasta do job mais recente: {latest_job_dir.name}\n")
+    
+    # Procura o best.pt dentro dessa pasta
+    best_model_path = latest_job_dir / 'weights' / 'best.pt'
+    
+    if not best_model_path.exists():
+        # Tenta variações de caminho
+        possible_paths = [
+            latest_job_dir / 'best.pt',
+            latest_job_dir / 'runs' / 'classify' / latest_job_dir.name / 'weights' / 'best.pt'
+        ]
+        for alt_path in possible_paths:
+            if alt_path.exists():
+                best_model_path = alt_path
+                break
+    
+    if not best_model_path.exists():
+        log_handle.write(f"\n[AVISO] Modelo best.pt não encontrado em: {best_model_path}\n")
+        log_handle.write(f"[AVISO] Pastas em {latest_job_dir}:\n")
+        for item in latest_job_dir.rglob('best.pt'):
+            log_handle.write(f"  - {item}\n")
+        return
+    
+    # Diretório de destino
+    models_dir = storage_models_yolo_dir()
+    models_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Nome do arquivo: usa o nome da pasta encontrada (ex: treinamento_classificacao28.pt)
+    dest_filename = f"{latest_job_dir.name}.pt"
+    dest_path = models_dir / dest_filename
+    
+    # Copia o arquivo
+    shutil.copy2(best_model_path, dest_path)
+    
+    log_handle.write(f"\n✓ Modelo salvo: {dest_path}\n")
+    log_handle.write(f"  Origem: {best_model_path}\n")
+    log_handle.flush()
+    
+    print(f"[MODEL SAVED] {dest_filename} | Origem: {best_model_path}")
 
 
 def prepare_dataset(
@@ -90,10 +204,11 @@ def _process_positive_class(
     class_name: str,
     config: dict
 ) -> None:
-    """Copia imagens da classe positiva para train/val/test."""
+    """Copia imagens da classe positiva para train/val/test, aplicando pré-processamento."""
     train_pct = config["train_percent"]
     val_pct = config["val_percent"]
     test_pct = config["test_percent"]
+    preprocessing_techniques = config.get("preprocessing", [])
     
     # Cria subpastas da classe
     for part in folders.values():
@@ -110,13 +225,13 @@ def _process_positive_class(
     train_n = int(ceil(total * train_pct / 100))
     val_n = int(ceil(total * val_pct / 100))
 
-    # Distribui imagens
+    # Distribui imagens com pré-processamento
     for img in images[:train_n]:
-        shutil.copy(img, folders["train"] / class_name / img.name)
+        _copy_with_preprocessing(img, folders["train"] / class_name / img.name, preprocessing_techniques)
     for img in images[train_n:train_n + val_n]:
-        shutil.copy(img, folders["val"] / class_name / img.name)
+        _copy_with_preprocessing(img, folders["val"] / class_name / img.name, preprocessing_techniques)
     for img in images[train_n + val_n:]:
-        shutil.copy(img, folders["test"] / class_name / img.name)
+        _copy_with_preprocessing(img, folders["test"] / class_name / img.name, preprocessing_techniques)
 
 
 def _process_negative_classes(
@@ -223,14 +338,15 @@ def _process_negative_classes(
             train_n = int(ceil(total * train_pct / 100))
             val_n = int(ceil(total * val_pct / 100))
 
+            preprocessing_techniques = config.get("preprocessing", [])
             for img in to_copy[:train_n]:
-                shutil.copy(img, folders["train"] / class_name_negative / img.name)
+                _copy_with_preprocessing(img, folders["train"] / class_name_negative / img.name, preprocessing_techniques)
                 used_sources.add(str(img))
             for img in to_copy[train_n:train_n + val_n]:
-                shutil.copy(img, folders["val"] / class_name_negative / img.name)
+                _copy_with_preprocessing(img, folders["val"] / class_name_negative / img.name, preprocessing_techniques)
                 used_sources.add(str(img))
             for img in to_copy[train_n + val_n:]:
-                shutil.copy(img, folders["test"] / class_name_negative / img.name)
+                _copy_with_preprocessing(img, folders["test"] / class_name_negative / img.name, preprocessing_techniques)
                 used_sources.add(str(img))
 
 
@@ -289,6 +405,13 @@ def execute_training_subprocess(
 
         if return_code == 0:
             log_file_handle.write("\n--- TREINAMENTO CONCLUÍDO COM SUCESSO ---\n")
+            
+            # Copia o melhor modelo para models_yolo
+            try:
+                _save_best_model(job_id, config, log_file_handle)
+            except Exception as e:
+                log_file_handle.write(f"\n[AVISO] Não foi possível salvar o melhor modelo: {e}\n")
+            
             state_callback(status="completed", process=None)
         else:
             log_file_handle.write(f"\n--- ERRO: Processo encerrado com código {return_code} ---\n")

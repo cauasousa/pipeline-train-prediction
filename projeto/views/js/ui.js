@@ -827,6 +827,15 @@
                 payload.options.split = 'predict';
             }
 
+            // Coleta técnicas de pré-processamento selecionadas
+            const preprocessingTechniques = Array.from(
+                document.querySelectorAll('#tipo-checkboxes-preprocessing input[type="checkbox"]:checked')
+            ).map(cb => cb.value);
+
+            if (preprocessingTechniques.length > 0) {
+                payload.preprocessing = preprocessingTechniques;
+            }
+
             if (source) payload.source = source;
 
             console.log('[DEBUG] Payload enviado:', JSON.stringify(payload, null, 2));
@@ -1661,6 +1670,36 @@
             // INICIALIZAÇÃO: Esta chamada garante que o JS entre em ação ao carregar a página.
             initializeNegativeLines();
 
+            // Carrega técnicas de pré-processamento disponíveis na página de treinamento
+            async function loadPreprocessingTechniques() {
+                const container = document.getElementById('tipo-checkboxes-preprocessing');
+                if (!container) return;
+
+                try {
+                    const techniques = await window.API.getPreprocessingTechniques();
+                    if (!techniques || techniques.length === 0) {
+                        container.innerHTML = '<div style="color: #999;">Nenhuma técnica disponível</div>';
+                        return;
+                    }
+
+                    container.innerHTML = '';
+                    techniques.forEach(tech => {
+                        const label = document.createElement('label');
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.value = tech;
+                        label.appendChild(checkbox);
+                        label.appendChild(document.createTextNode(` ${tech}`));
+                        container.appendChild(label);
+                    });
+                } catch (e) {
+                    console.warn('[UI] Erro ao carregar técnicas de pré-processamento:', e);
+                    container.innerHTML = '<div style="color: #999;">Erro ao carregar técnicas</div>';
+                }
+            }
+
+            loadPreprocessingTechniques().catch(e => console.warn('Falha ao carregar técnicas de pré-processamento:', e));
+
             // --- Controle de Treinamento ---
             if (global.TrainingControl && typeof global.TrainingControl.init === 'function') {
                 global.TrainingControl.init();
@@ -1831,9 +1870,38 @@
             }
         }
 
+        // Carrega técnicas de pré-processamento disponíveis
+        async function loadPreprocessingTechniques() {
+            const container = document.getElementById('tipo-checkboxes-preprocessing');
+            if (!container) return;
+
+            try {
+                const techniques = await window.API.getPreprocessingTechniques();
+                if (!techniques || techniques.length === 0) {
+                    container.innerHTML = '<div style="color: #999;">Nenhuma técnica disponível</div>';
+                    return;
+                }
+
+                container.innerHTML = '';
+                techniques.forEach(tech => {
+                    const label = document.createElement('label');
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.value = tech;
+                    label.appendChild(checkbox);
+                    label.appendChild(document.createTextNode(` ${tech}`));
+                    container.appendChild(label);
+                });
+            } catch (e) {
+                console.warn('[UI] Erro ao carregar técnicas de pré-processamento:', e);
+                container.innerHTML = '<div style="color: #999;">Erro ao carregar técnicas</div>';
+            }
+        }
+
         // inicialização da tela de predição
         loadModelsIntoContainer().catch(e => console.warn('Falha ao carregar modelos:', e));
         loadDatasetsForPrediction().catch(e => console.warn('Falha ao carregar datasets:', e));
+        loadPreprocessingTechniques().catch(e => console.warn('Falha ao carregar técnicas de pré-processamento:', e));
 
         // Wire source cards
         const sourceCards = document.querySelectorAll('.source-card');

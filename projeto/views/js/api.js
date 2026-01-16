@@ -191,5 +191,10 @@
         return r || {};
     }
 
-    global.API = Object.assign(global.API || {}, { API_BASE, safeFetch, testIsImage, getLastDir, getModels, postPredict, getPredictionsList, listModelsInRun, getDatasets, getDatasetInfo, getNegativeLines, uploadDataset });
+    async function getPreprocessingTechniques() {
+        const r = await safeFetch(`${API_BASE}/api/preprocessing/techniques`);
+        return r?.techniques || [];
+    }
+
+    global.API = Object.assign(global.API || {}, { API_BASE, safeFetch, testIsImage, getLastDir, getModels, postPredict, getPredictionsList, listModelsInRun, getDatasets, getDatasetInfo, getNegativeLines, uploadDataset, getPreprocessingTechniques });
 })(window);

@@ -15,8 +15,6 @@ def workspace_root() -> Path:
     return Path(r"M:\content\drive\Mydrive\pipeline").resolve()
 
 
-def custom_models_dir() -> Path:
-    return workspace_root() / 'custom' / 'models'
 
 
 def datasets_custom_dir() -> Path:

@@ -416,7 +416,17 @@ label input[type="radio"] {
     color: var(--text-primary);
     cursor: pointer;
     min-width: 160px;
-    max-width: 260px;
+    flex: 1 1 280px;
+    max-width: 100%;
+}
+
+.model-item-compact label {
+    display: block;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    min-width: 0;
 }
 
 .model-item-compact .model-checkbox {
@@ -668,9 +678,8 @@ textarea#logs {
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 16/9;
-    /* mantém proporção agradável */
-    object-fit: cover;
+    /* Mantém toda a arte visível sem cortar rótulos do YOLO */
+    object-fit: contain;
     border-radius: 6px;
     transition: transform 0.18s ease, box-shadow 0.18s ease;
     cursor: pointer;

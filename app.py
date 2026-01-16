@@ -26,9 +26,11 @@ except ImportError:
 try:
     from projeto.app.routes import training as training_mod
     from projeto.app.routes import prediction as prediction_mod
+    from projeto.app.routes import preprocessing as preprocessing_mod
     
     app.register_blueprint(training_mod.bp, url_prefix="/train")
     app.register_blueprint(prediction_mod.bp, url_prefix="/predict")
+    app.register_blueprint(preprocessing_mod.bp, url_prefix="/api/preprocessing")
 except Exception as e:
     print("Falha ao importar blueprints de projeto.app.routes:", e)
 
@@ -201,7 +203,7 @@ def list_train_images(job_id):
     resolved_root = None
     resolved_name = None
 
-    print("=-=-=-=- Iniciando busca pelo job mais recente =-=-=-=-")
+    # print("=-=-=-=- Iniciando busca pelo job mais recente =-=-=-=-")
 
     for root in get_candidate_roots():
         root_path = Path(root)
@@ -238,7 +240,7 @@ def list_train_images(job_id):
         search_dirs.append(latest_job_dir)
         search_dirs.append(latest_job_dir / 'predicao')
         
-        print(f"Diretório mais recente encontrado: {latest_job_dir}")
+        # print(f"Diretório mais recente encontrado: {latest_job_dir}")
         break 
 
     if not search_dirs:
@@ -270,8 +272,8 @@ def list_train_images(job_id):
         except Exception as e:
             print(f"Erro ao processar pasta {base}: {e}")
             continue
-    print("=-=-=-=- Busca concluída =-=-=-=-")
-    print(f"Imagens encontradas: {resolved_root} / {resolved_name} -> {found} imagens")
+    # print("=-=-=-=- Busca concluída =-=-=-=-")
+    # print(f"Imagens encontradas: {resolved_root} / {resolved_name} -> {found} imagens")
     return jsonify({"images": found, "resolved_folder": resolved_name, "resolved_root": str(resolved_root)})
 
 

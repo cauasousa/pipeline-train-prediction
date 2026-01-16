@@ -4,11 +4,14 @@ Serviço de predição - encapsula lógica de resolução de modelos e execuçã
 import logging
 import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
+import cv2
 
-from projeto.app.paths import custom_models_dir, storage_models_yolo_dir, storage_datasets_yolo_dir, workspace_root
+from projeto.app.paths import storage_models_yolo_dir, storage_datasets_yolo_dir, workspace_root
 from projeto.app.routes.train_models import function_test_yolo
+from projeto.app.services.preprocessing_service import apply_custom_preprocessing
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -18,12 +21,11 @@ def resolve_model_paths(models: List[str]) -> Tuple[List[str], List[str]]:
     """
     Resolve a lista de modelos para caminhos de arquivo válidos.
     Retorna (model_paths, missing).
-    Procura em: raiz do projeto, custom_models_dir(), storage_models_yolo_dir().
+    Procura em: raiz do projeto, storage_models_yolo_dir().
     """
     # Ordem de busca: raiz do projeto -> custom -> storage
     search_dirs = [
         Path.cwd(),  # Raiz do projeto (onde os modelos yolo*.pt estão)
-        # custom_models_dir(),
         storage_models_yolo_dir()
     ]
     
@@ -109,6 +111,36 @@ def _get_image_extensions() -> set:
     """Retorna extensões de imagem suportadas."""
     return {".png", ".jpg", ".jpeg", ".bmp", ".gif"}
 
+def _copy_with_preprocessing(src_path: Path, dest_path: Path, techniques: List[str]) -> None:
+    """Copia imagem aplicando técnicas de pré-processamento.
+    
+    Args:
+        src_path: Caminho da imagem origem
+        dest_path: Caminho de destino
+        techniques: Lista de técnicas a aplicar
+    """
+    if not techniques:
+        # Se não há técnicas, copia direto
+        shutil.copy(src_path, dest_path)
+        return
+    
+    try:
+        # Lê imagem
+        img = cv2.imread(str(src_path))
+        if img is None:
+            # Fallback: copia sem processar
+            shutil.copy(src_path, dest_path)
+            return
+        
+        # Aplica técnicas
+        processed_img = apply_custom_preprocessing(img, techniques)
+        
+        # Salva imagem processada
+        cv2.imwrite(str(dest_path), processed_img)
+    except Exception as e:
+        print(f"[WARNING] Erro ao processar {src_path}: {e}. Copiando sem processamento.")
+        shutil.copy(src_path, dest_path)
+
 def _has_images_directly(folder: Path) -> bool:
     """Verifica se a pasta tem imagens diretas (não em subpastas)."""
     for item in folder.iterdir():
@@ -132,7 +164,8 @@ def run_prediction(
     dataset_path: str = None,
     split: str = "test",
     project_name: str = "predicao",
-    output_dir: Path = None
+    output_dir: Path = None,
+    preprocessing: List[str] = None
 ) -> Tuple[Dict[str, Any], List[str], List[str]]:
     """
     Executa predição dos modelos sobre o split especificado.
@@ -140,8 +173,17 @@ def run_prediction(
     Se o split contém subpastas com imagens (estrutura: test/LINHA/imagens),
     processa cada subpasta separadamente e mantém a hierarquia na saída.
     
+    Args:
+        models: Lista de nomes/paths dos modelos
+        dataset_path: Caminho do dataset
+        split: Split a usar (test, val, etc)
+        project_name: Nome do projeto
+        output_dir: Diretório de saída
+        preprocessing: Lista de técnicas de pré-processamento a aplicar
+    
     Retorna (results, evaluated, missing).
     """
+    preprocessing = preprocessing or []
     model_paths, missing = resolve_model_paths(models)
     
     if not model_paths:
@@ -179,60 +221,131 @@ def run_prediction(
     for sf in subfolders:
         print(f"  - {sf.name}")
     
-    if subfolders:
-        # Estrutura com subpastas: processa cada uma separadamente
+    # Se há pré-processamento, cria cópia temporária preprocessada
+    temp_dir = None
+    if preprocessing:
+        print(f"\n>>> Aplicando pré-processamento: {preprocessing}")
+        temp_dir = Path(tempfile.mkdtemp(prefix="pred_preprocessed_"))
         try:
-            from ultralytics import YOLO
-        except ModuleNotFoundError:
-            # Mock quando Ultralytics não está disponível
-            for model_name in evaluated:
-                results[model_name] = {
-                    "mock": True,
-                    "notes": "Instale 'ultralytics' para resultados reais.",
-                    "subfolders": {}
-                }
-            return results, evaluated, missing
-        
-        for model_path in model_paths:
-            model_name = os.path.basename(model_path).replace('.pt', '')
-            model_output = {}
+            # Replica estrutura de pastas
+            if subfolders:
+                for subfolder in subfolders:
+                    temp_subfolder = temp_dir / subfolder.name
+                    temp_subfolder.mkdir(parents=True, exist_ok=True)
+                    for img_path in subfolder.iterdir():
+                        if img_path.suffix.lower() in _get_image_extensions():
+                            _copy_with_preprocessing(img_path, temp_subfolder / img_path.name, preprocessing)
+            else:
+                # Imagens diretas no split_path
+                for img_path in split_path.iterdir():
+                    if img_path.is_file() and img_path.suffix.lower() in _get_image_extensions():
+                        _copy_with_preprocessing(img_path, temp_dir / img_path.name, preprocessing)
             
-            print(f"\n>>> Processando modelo: {model_name}")
+            # Usa diretório temporário como source
+            split_path = temp_dir
+            subfolders = _get_subfolders_with_images(split_path)
+        except Exception as e:
+            print(f"Erro ao aplicar pré-processamento: {e}")
+            if temp_dir and temp_dir.exists():
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            raise
+    
+    try:
+        if subfolders:
+            # Estrutura com subpastas: processa cada uma separadamente
+            try:
+                from ultralytics import YOLO
+            except ModuleNotFoundError:
+                # Mock quando Ultralytics não está disponível
+                for model_name in evaluated:
+                    results[model_name] = {
+                        "mock": True,
+                        "notes": "Instale 'ultralytics' para resultados reais.",
+                        "subfolders": {}
+                    }
+                if temp_dir and temp_dir.exists():
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                return results, evaluated, missing
             
-            # Processa cada subpasta
-            for subfolder in subfolders:
-                subfolder_name = subfolder.name
+            for model_path in model_paths:
+                model_name = os.path.basename(model_path).replace('.pt', '')
+                model_output = {}
                 
-                try:
-                    print(f"\n  >>> Processando subpasta: {subfolder_name}")
-                    print(f"      Source: {subfolder}")
+                print(f"\n>>> Processando modelo: {model_name}")
+                
+                # Processa cada subpasta
+                for subfolder in subfolders:
+                    subfolder_name = subfolder.name
                     
-                    model = YOLO(model_path)
-                    
-                    # Calcula os paths
-                    project_path = output_dir / model_name if output_dir else Path(project_name)
-                    print(f"      Project: {project_path}")
-                    print(f"      Name: {subfolder_name}")
-                    
-                    predict_result = model.predict(
-                        source=str(subfolder),
-                        project=str(project_path),
-                        name=subfolder_name,
-                        save=True
-                    )
-                    
-                    print(f"      YOLO concluído!")
-                    
-                    # Coleta imagens preditas
-                    images = []
-                    if output_dir:
-                        print(f"\n      ===== ESTRUTURA COMPLETA DE output_dir =====")
-                        if output_dir.exists():
-                            all_files = list(output_dir.rglob('*'))
-                            print(f"      Total de itens encontrados: {len(all_files)}")
-                            for item in all_files[:50]:  # Limita a 50 primeiros
-                                print(f"        {item}")
-                        print(f"      ===== FIM ESTRUTURA =====\n")
+                    try:
+                        print(f"\n  >>> Processando subpasta: {subfolder_name}")
+                        print(f"      Source: {subfolder}")
+                        
+                        model = YOLO(model_path)
+                        
+                        # Calcula os paths
+                        project_path = output_dir / model_name if output_dir else Path(project_name)
+                        print(f"===========-=-=-=-==========-")
+                        print(f"===========-=-=-=-==========-")
+                        print(f"===========-=-=-=-==========-")
+                        print(f"===========-=-=-=-==========-")
+                        print(f"===========-=-=-=-==========-")
+                        print(f"===========-=-=-=-==========-")
+                        print(f"      Project: {project_path}")
+                        print(f"      Name: {subfolder_name}")
+                        
+                        predict_result = model.predict(
+                            source=str(subfolder),
+                            project=str(project_path),
+                            name=subfolder_name,
+                            save=False,
+                            line_width=0,
+                            show_labels=False,
+                            show_conf=False,
+                            imgsz=192,
+                            stream=True
+                        )
+                        # CRÍTICO: Sem este loop, o YOLO não processa nada!
+                        for r in predict_result:
+                            img = r.orig_img.copy()
+                            top1 = getattr(r.probs, "top1", None)
+                            conf = getattr(r.probs, "top1conf", None)
+                            if top1 is not None and conf is not None:
+                                label = r.names[top1] if hasattr(r, "names") and top1 in r.names else str(top1)
+                                text = f"{label}: {conf.item():.2f}"
+
+                                # Ajusta fonte dinamicamente para caber no topo, mesmo com nomes longos
+                                font = cv2.FONT_HERSHEY_SIMPLEX
+                                font_scale = max(0.35, min(0.55, (img.shape[1] / 900) * 0.5))
+                                thickness = 1
+                                (w, h), _ = cv2.getTextSize(text, font, font_scale, thickness)
+
+                                # Reduz progressivamente se ainda exceder a largura útil
+                                max_width = img.shape[1] - 8  # margem lateral
+                                while w + 6 > max_width and font_scale > 0.28:
+                                    font_scale -= 0.05
+                                    (w, h), _ = cv2.getTextSize(text, font, font_scale, thickness)
+
+                                cv2.rectangle(img, (2, 2), (w + 8, h + 10), (0, 0, 0), -1)
+                                cv2.putText(img, text, (5, h + 3), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+
+                            yolo_output_dir = project_path / subfolder_name
+                            yolo_output_dir.mkdir(parents=True, exist_ok=True)
+                            save_path = yolo_output_dir / Path(r.path).name
+                            cv2.imwrite(str(save_path), img)
+
+                        print(f"      YOLO concluído!")
+                        
+                        # Coleta imagens preditas
+                        images = []
+                        if output_dir:
+                            print(f"\n      ===== ESTRUTURA COMPLETA DE output_dir =====")
+                            if output_dir.exists():
+                                all_files = list(output_dir.rglob('*'))
+                                print(f"      Total de itens encontrados: {len(all_files)}")
+                                for item in all_files[:50]:  # Limita a 50 primeiros
+                                    print(f"        {item}")
+                            print(f"      ===== FIM ESTRUTURA =====\n")
                         
                         # YOLO salva em output_dir/model_name/subfolder_name/
                         yolo_output = output_dir / model_name / subfolder_name
@@ -253,32 +366,38 @@ def run_prediction(
                                 found = list(output_dir.rglob(ext))
                                 print(f"        {ext}: {len(found)} arquivos")
                                 images.extend([str(f) for f in found])
-                    
-                    print(f"      ✓ Total de imagens coletadas: {len(images)}")
-                    model_output[subfolder_name] = {
-                        "predict_result": str(predict_result),
-                        "images": images
-                    }
-                except Exception as e:
-                    print(f"      ✗ ERRO: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    model_output[subfolder_name] = {
-                        "error": str(e),
-                        "images": []
-                    }
-            
-            results[model_name] = {"subfolders": model_output}
-            print(f"\n✓ Modelo {model_name}: {len(model_output)} subpastas processadas")
-    else:
-        # Estrutura flat: processa normalmente com function_test_yolo
-        results = function_test_yolo(
-            model_paths=model_paths,
-            dataset_path=str(split_path.parent),
-            split=split_path.name,
-            project_name=project_name,
-            output_dir=str(output_dir) if output_dir else None
-        )
+                        
+                        print(f"      ✓ Total de imagens coletadas: {len(images)}")
+                        model_output[subfolder_name] = {
+                            "predict_result": str(predict_result),
+                            "images": images
+                        }
+                    except Exception as e:
+                        print(f"      ✗ ERRO: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        model_output[subfolder_name] = {
+                            "error": str(e),
+                            "images": []
+                        }
+                
+                results[model_name] = {"subfolders": model_output}
+                print(f"\n✓ Modelo {model_name}: {len(model_output)} subpastas processadas")
+        else:
+            print(f"\n------------------>>> Estrutura flat detectada, sem subpastas com imagens.")
+            # Estrutura flat: processa normalmente com function_test_yolo
+            results = function_test_yolo(
+                model_paths=model_paths,
+                dataset_path=str(split_path.parent),
+                split=split_path.name,
+                project_name=project_name,
+                output_dir=str(output_dir) if output_dir else None
+            )
+    finally:
+        # Limpa diretório temporário de pré-processamento
+        if temp_dir and temp_dir.exists():
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            print(f"\n>>> Diretório temporário removido: {temp_dir}")
     
     return results, evaluated, missing
 

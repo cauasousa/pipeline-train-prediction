@@ -58,7 +58,12 @@ def function_test_yolo(model_paths=None, dataset_path=None, split="val", project
             m = YOLO(mp)
             model_basename = os.path.basename(mp)
             # Se output_dir for fornecido, usar como project; caso contrário, usar project_name
-            print("AQUI")
+            print("===============================AQUI")
+            print("===============================AQUI")
+            print("===============================AQUI")
+            print("===============================AQUI")
+            print("===============================AQUI")
+            print("===============================AQUI")
             if output_dir:
                 # YOLO cria: output_dir/runs/classify/model_basename/
                 # Nós queremos: output_dir/model_basename/

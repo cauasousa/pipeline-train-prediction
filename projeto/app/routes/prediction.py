@@ -81,8 +81,9 @@ def run_predict():
     models = payload.get("models", [])
     source = (payload.get("source") or "test").strip().lower()
     options = payload.get("options") or {}
+    preprocessing = payload.get("preprocessing", []) or payload.get("options", {}).get("preprocessing", [])
     
-    log.info("POST /predict/run - source=%s, models=%s", source, models)
+    log.info("POST /predict/run - source=%s, models=%s, preprocessing=%s", source, models, preprocessing)
     
     if not models or not isinstance(models, list):
         detail = f"Payload inválido: 'models' é obrigatório e deve ser lista."
@@ -167,7 +168,8 @@ def run_predict():
             dataset_path=dataset_path,
             split=split,
             project_name="predicao",
-            output_dir=output_path
+            output_dir=output_path,
+            preprocessing=preprocessing
         )
         
         if results is None:
