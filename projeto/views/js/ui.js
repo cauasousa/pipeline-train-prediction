@@ -661,7 +661,15 @@
         const randTrain = Number(document.getElementById('rand-train-percent')?.value ?? 70);
         const randVal = Number(document.getElementById('rand-val-percent')?.value ?? 20);
         const randTest = Number(document.getElementById('rand-test-percent')?.value ?? 10);
-        const preprocessingTypes = Array.from(document.querySelectorAll('#tipo-checkboxes-preprocessing input[type="checkbox"]:checked')).map(i => i.value);
+
+        // Obtém pipeline de pré-processamento com parâmetros do modal
+        let preprocessingPipeline = [];
+        if (global.PreprocessingModal && typeof global.PreprocessingModal.getPipeline === 'function') {
+            preprocessingPipeline = global.PreprocessingModal.getPipeline();
+        } else {
+            // Fallback: usa apenas nomes dos checkboxes (sem parâmetros)
+            preprocessingPipeline = Array.from(document.querySelectorAll('#tipo-checkboxes-preprocessing input[type="checkbox"]:checked')).map(i => i.value);
+        }
 
         // 2. Leitura da Configuração de Treino (Full Config)
         let fullConfig = ConfigManager.loadConfig(); // Começa com o valor salvo
@@ -683,7 +691,7 @@
                 test_percent: testPercent,
                 types_to_include: negativeLinesSelection, // <<< ENVIAMOS O MAPA ESTRUTURADO AQUI
                 random_split: { train: randTrain, val: randVal, test: randTest },
-                preprocessing: preprocessingTypes
+                preprocessing: preprocessingPipeline  // Pipeline completo com parâmetros
             },
             full_config: fullConfig
         };
@@ -827,13 +835,19 @@
                 payload.options.split = 'predict';
             }
 
-            // Coleta técnicas de pré-processamento selecionadas
-            const preprocessingTechniques = Array.from(
-                document.querySelectorAll('#tipo-checkboxes-preprocessing input[type="checkbox"]:checked')
-            ).map(cb => cb.value);
+            // Coleta técnicas de pré-processamento selecionadas com parâmetros da PREDIÇÃO
+            let preprocessingPipeline = [];
+            if (global.PreprocessingPrediction && typeof global.PreprocessingPrediction.getPipeline === 'function') {
+                preprocessingPipeline = global.PreprocessingPrediction.getPipeline();
+            } else {
+                // Fallback: usa apenas nomes dos checkboxes (sem parâmetros)
+                preprocessingPipeline = Array.from(
+                    document.querySelectorAll('#tipo-checkboxes-preprocessing input[type="checkbox"]:checked')
+                ).map(cb => cb.value);
+            }
 
-            if (preprocessingTechniques.length > 0) {
-                payload.preprocessing = preprocessingTechniques;
+            if (preprocessingPipeline.length > 0) {
+                payload.preprocessing = preprocessingPipeline;
             }
 
             if (source) payload.source = source;
@@ -1330,8 +1344,22 @@
                     if (prev) { try { sel.value = prev; } catch (e) { /* ignore */ } }
                     // Atualiza a contagem após recarregar opções
                     try { await updatePositiveCountForSelected(); } catch (e) { /* ignore */ }
+                    // Habilita/atualiza modal de pré-processamento
+                    setPreprocessButtonState();
                 } catch (e) {
                     sel.innerHTML = '<option value="">Erro ao carregar datasets</option>';
+                }
+            }
+
+            function setPreprocessButtonState() {
+                const sel = document.getElementById('dataset-select');
+                const btn = document.getElementById('open-preprocess-modal-btn');
+                const dataset = sel?.value || '';
+                if (!btn) return;
+                const hasSelection = Boolean(dataset);
+                btn.disabled = !hasSelection;
+                if (global.PreprocessingModal && typeof global.PreprocessingModal.setDataset === 'function') {
+                    global.PreprocessingModal.setDataset(dataset);
                 }
             }
 
@@ -1520,7 +1548,10 @@
             // Chamada inicial de carregamento de datasets
             loadDatasetsIntoSelect();
             // Conecta listener para atualizar contagem ao mudar seleção
-            document.getElementById('dataset-select')?.addEventListener('change', () => updatePositiveCountForSelected());
+            document.getElementById('dataset-select')?.addEventListener('change', () => {
+                updatePositiveCountForSelected();
+                setPreprocessButtonState();
+            });
 
             // --- Seleção de Dados Negativos (Novos Listeners) ---
             const table = document.getElementById('negative-selection-table');
@@ -1699,6 +1730,14 @@
             }
 
             loadPreprocessingTechniques().catch(e => console.warn('Falha ao carregar técnicas de pré-processamento:', e));
+
+            // Atualiza estado do botão/previsualização conforme seleção atual
+            setPreprocessButtonState();
+
+            // Inicializa o modal de pré-processamento
+            if (global.PreprocessingModal && typeof global.PreprocessingModal.init === 'function') {
+                global.PreprocessingModal.init();
+            }
 
             // --- Controle de Treinamento ---
             if (global.TrainingControl && typeof global.TrainingControl.init === 'function') {
@@ -1902,6 +1941,21 @@
         loadModelsIntoContainer().catch(e => console.warn('Falha ao carregar modelos:', e));
         loadDatasetsForPrediction().catch(e => console.warn('Falha ao carregar datasets:', e));
         loadPreprocessingTechniques().catch(e => console.warn('Falha ao carregar técnicas de pré-processamento:', e));
+
+        // Inicializa módulo de pré-processamento para PREDIÇÃO
+        if (global.PreprocessingPrediction && typeof global.PreprocessingPrediction.init === 'function') {
+            global.PreprocessingPrediction.init();
+            // Carrega as técnicas de treinamento se estiverem salvass
+            const trainingPipeline = localStorage.getItem('preprocessing_training_pipeline');
+            if (trainingPipeline) {
+                try {
+                    const pipeline = JSON.parse(trainingPipeline);
+                    global.PreprocessingPrediction.loadFromTraining(pipeline);
+                } catch (e) {
+                    console.warn('[UI] Erro ao carregar pipeline de treinamento na predição:', e);
+                }
+            }
+        }
 
         // Wire source cards
         const sourceCards = document.querySelectorAll('.source-card');

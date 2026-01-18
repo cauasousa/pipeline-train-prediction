@@ -217,7 +217,7 @@ def run_prediction(
     
     # Verifica se tem subpastas com imagens
     subfolders = _get_subfolders_with_images(split_path)
-    print(f"Subpastas encontradas: {len(subfolders)}")
+    # print(f"Subpastas encontradas: {len(subfolders)}")
     for sf in subfolders:
         print(f"  - {sf.name}")
     
@@ -312,7 +312,9 @@ def run_prediction(
                             conf = getattr(r.probs, "top1conf", None)
                             if top1 is not None and conf is not None:
                                 label = r.names[top1] if hasattr(r, "names") and top1 in r.names else str(top1)
-                                text = f"{label}: {conf.item():.2f}"
+                                # Limita o nome da classe a 5 caracteres
+                                label_short = label[:5]
+                                text = f"{label_short}: {conf.item():.2f}"
 
                                 # Ajusta fonte dinamicamente para caber no topo, mesmo com nomes longos
                                 font = cv2.FONT_HERSHEY_SIMPLEX

@@ -210,6 +210,8 @@ def _process_positive_class(
     test_pct = config["test_percent"]
     preprocessing_techniques = config.get("preprocessing", [])
     
+    print(f"[DEBUG] Técnicas de pré-processamento recebidas: {preprocessing_techniques}")
+    
     # Cria subpastas da classe
     for part in folders.values():
         (part / class_name).mkdir(parents=True, exist_ok=True)

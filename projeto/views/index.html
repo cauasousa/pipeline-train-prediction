@@ -46,6 +46,82 @@
         </div>
     </div>
 
+    <!-- Modal de Pré-processamento (renderizado no nível raiz para evitar conflitos de z-index) -->
+    <div id="preprocess-modal" class="preprocess-modal">
+        <div class="preprocess-modal-container">
+            <!-- HEADER -->
+            <div class="preprocess-modal-header">
+                <strong>Pré-processamento de Imagem — Pipeline Interativo</strong>
+                <div>
+                    <button id="apply-preprocess-btn" class="btn-modal btn-modal-apply">Aplicar</button>
+                    <button id="close-preprocess-modal-btn" class="btn-modal btn-modal-close">Fechar</button>
+                </div>
+            </div>
+
+            <!-- BODY -->
+            <div class="preprocess-modal-body">
+                <!-- PIPELINE -->
+                <div class="preprocess-modal-sidebar">
+                    <span class="preprocess-modal-label">ORDEM DE APLICAÇÃO</span>
+                    <ul id="preprocessing-pipeline-list" class="preprocessing-pipeline-list">
+                        <!-- Técnicas serão adicionadas aqui dinamicamente -->
+                    </ul>
+
+                    <div class="preprocess-modal-controls">
+                        <label class="preprocess-modal-label">TÉCNICAS DISPONÍVEIS</label>
+                        <select id="available-techniques-select" class="preprocess-select">
+                            <option value="">Carregando...</option>
+                        </select>
+                        <button id="add-technique-btn" class="btn-add-technique">+ Adicionar técnica</button>
+                    </div>
+                </div>
+
+                <!-- VISUALIZAÇÃO -->
+                <div class="preprocess-modal-content">
+                    <!-- PIPELINE DE ETAPAS CUMULATIVAS -->
+                    <div class="pipeline-steps-section">
+                        <span class="preprocess-modal-label">EVOLUÇÃO DO PIPELINE — CADA ETAPA</span>
+                        <div id="pipeline-steps-gallery" class="pipeline-steps-gallery">
+                            <!-- Etapas serão renderizadas aqui dinamicamente -->
+                        </div>
+                    </div>
+
+                    <!-- PREVIEWS PRINCIPAIS -->
+                    <div class="preprocess-modal-grid">
+                        <!-- ORIGINAL -->
+                        <div class="preprocess-preview-card">
+                            <span class="preview-label preview-label-original">ORIGINAL</span>
+                            <img src="" class="preview-img original">
+                        </div>
+
+                        <!-- PIPELINE FINAL -->
+                        <div class="preprocess-preview-card preview-card-result">
+                            <span class="preview-label preview-label-result">RESULTADO FINAL</span>
+                            <img src="" class="preview-img result">
+                        </div>
+
+                        <!-- TÉCNICA ISOLADA -->
+                        <div class="preprocess-preview-card">
+                            <span class="preview-label preview-label-isolated">TÉCNICA ISOLADA</span>
+                            <div style="margin: 6px 0;">
+                                <select id="isolated-technique-select" class="preprocess-select"
+                                    style="max-width: 100%;">
+                                    <option value="">Selecione a técnica isolada...</option>
+                                </select>
+                            </div>
+                            <img src="" class="preview-img isolated">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SNACKBAR -->
+            <div class="preprocess-modal-footer">
+                ● Pipeline atualizado — aguardando processamento
+            </div>
+        </div>
+    </div>
+
     <script src="./js/api.js"></script>
     <script src="./js/finder.js"></script>
     <script src="./js/modules/config.js"></script>
@@ -53,6 +129,8 @@
     <script src="./js/modules/navigation.js"></script>
     <script src="./js/training_control.js"></script>
     <script src="./js/prediction_history.js"></script>
+    <script src="./js/preprocessing_modal.js"></script>
+    <script src="./js/preprocessing_modal_prediction.js"></script>
     <script src="./js/ui.js"></script>
 
     <script>

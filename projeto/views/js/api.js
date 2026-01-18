@@ -196,5 +196,58 @@
         return r?.techniques || [];
     }
 
-    global.API = Object.assign(global.API || {}, { API_BASE, safeFetch, testIsImage, getLastDir, getModels, postPredict, getPredictionsList, listModelsInRun, getDatasets, getDatasetInfo, getNegativeLines, uploadDataset, getPreprocessingTechniques });
+    // Solicita uma imagem de pré-visualização com técnicas aplicadas
+    async function getPreprocessingPreview(dataset, techniques) {
+        try {
+            const params = new URLSearchParams();
+            if (dataset) params.set('dataset', dataset);
+            if (Array.isArray(techniques)) {
+                params.set('techniques', JSON.stringify(techniques));
+            }
+            const url = `${API_BASE}/api/preprocessing/preview?${params.toString()}`;
+            const r = await safeFetch(url);
+            return r || null;
+        } catch (e) {
+            console.warn('[API] getPreprocessingPreview falhou', e);
+            return null;
+        }
+    }
+
+    // Pré-visualização com pipeline parametrizado (POST)
+    async function postPreprocessingPreview(dataset, pipeline) {
+        try {
+            const res = await fetch(`${API_BASE}/api/preprocessing/preview`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dataset, pipeline })
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                console.error('[API] postPreprocessingPreview error:', res.status, err);
+                return null;
+            }
+            return await res.json();
+        } catch (e) {
+            console.warn('[API] postPreprocessingPreview falhou', e);
+            return null;
+        }
+    }
+
+    // Upload de imagem de referência para técnicas (ex: Histogram Matching)
+    async function uploadPreprocessingReference(formData) {
+        try {
+            const res = await fetch(`${API_BASE}/api/preprocessing/upload-reference`, { method: 'POST', body: formData });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                console.error('[API] uploadPreprocessingReference error:', res.status, err);
+                return null;
+            }
+            return await res.json();
+        } catch (e) {
+            console.warn('[API] uploadPreprocessingReference falhou', e);
+            return null;
+        }
+    }
+
+    global.API = Object.assign(global.API || {}, { API_BASE, safeFetch, testIsImage, getLastDir, getModels, postPredict, getPredictionsList, listModelsInRun, getDatasets, getDatasetInfo, getNegativeLines, uploadDataset, getPreprocessingTechniques, getPreprocessingPreview, postPreprocessingPreview, uploadPreprocessingReference });
 })(window);
