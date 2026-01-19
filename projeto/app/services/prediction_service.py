@@ -271,7 +271,7 @@ def run_prediction(
                 model_name = os.path.basename(model_path).replace('.pt', '')
                 model_output = {}
                 
-                print(f"\n>>> Processando modelo: {model_name}")
+                # print(f"\n>>> Processando modelo: {model_name}")
                 
                 # Processa cada subpasta
                 for subfolder in subfolders:
@@ -341,27 +341,27 @@ def run_prediction(
                         # Coleta imagens preditas
                         images = []
                         if output_dir:
-                            print(f"\n      ===== ESTRUTURA COMPLETA DE output_dir =====")
+                            # print(f"\n      ===== ESTRUTURA COMPLETA DE output_dir =====")
                             if output_dir.exists():
                                 all_files = list(output_dir.rglob('*'))
-                                print(f"      Total de itens encontrados: {len(all_files)}")
-                                for item in all_files[:50]:  # Limita a 50 primeiros
-                                    print(f"        {item}")
-                            print(f"      ===== FIM ESTRUTURA =====\n")
+                                # print(f"      Total de itens encontrados: {len(all_files)}")
+                                # for item in all_files[:50]:  # Limita a 50 primeiros
+                                    # print(f"        {item}")
+                            # print(f"      ===== FIM ESTRUTURA =====\n")
                         
                         # YOLO salva em output_dir/model_name/subfolder_name/
                         yolo_output = output_dir / model_name / subfolder_name
-                        print(f"      Procurando em: {yolo_output}")
-                        print(f"      Existe? {yolo_output.exists()}")
+                        # print(f"      Procurando em: {yolo_output}")
+                        # print(f"      Existe? {yolo_output.exists()}")
                         
                         if yolo_output.exists():
-                            print(f"      Listando recursivamente...")
+                            # print(f"      Listando recursivamente...")
                             for item in yolo_output.rglob('*'):
                                 if item.is_file():
-                                    print(f"        ARQUIVO: {item} (ext: {item.suffix.lower()})")
+                                    # print(f"        ARQUIVO: {item} (ext: {item.suffix.lower()})")
                                     if item.suffix.lower() in {'.jpg', '.png', '.jpeg'}:
                                         images.append(str(item))
-                                        print(f"          ✓ ADICIONADO!")
+                                        # print(f"          ✓ ADICIONADO!")
                         else:
                             print(f"      ⚠ Diretório não existe, buscando em qualquer lugar...")
                             for ext in ['*.jpg', '*.png', '*.jpeg']:

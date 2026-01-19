@@ -70,9 +70,12 @@ def run_predict():
         models_json = request.form.get('models')
         models = json_lib.loads(models_json) if models_json else []
         source = request.form.get('source', 'upload').strip().lower()
-        options = {}
-        payload = {"models": models, "source": source, "options": options}
-        print(f"[DEBUG] FormData recebido - models: {models}, source: {source}, files: {len(request.files.getlist('files'))}")
+        options_json = request.form.get('options')
+        preprocessing_json = request.form.get('preprocessing')
+        options = json_lib.loads(options_json) if options_json else {}
+        preprocessing = json_lib.loads(preprocessing_json) if preprocessing_json else []
+        payload = {"models": models, "source": source, "options": options, "preprocessing": preprocessing}
+        print(f"[DEBUG] FormData recebido - models: {models}, source: {source}, files: {len(request.files.getlist('files'))}, preprocessing: {preprocessing}")
     else:
         # JSON normal
         payload = request.get_json() or {}
@@ -203,21 +206,21 @@ def run_predict():
                     return None
             
             for model, data in list(results_summary.items()):
-                print(f"\nProcessando modelo: {model}")
+                # print(f"\nProcessando modelo: {model}")
                 if isinstance(data, dict):
                     # Nova estrutura com subfolders
                     if "subfolders" in data and isinstance(data["subfolders"], dict):
-                        print(f"  Tem subfolders: {list(data['subfolders'].keys())}")
+                        # print(f"  Tem subfolders: {list(data['subfolders'].keys())}")
                         for subfolder_name, subfolder_data in data["subfolders"].items():
-                            print(f"    Subfolder: {subfolder_name}")
+                            # print(f"    Subfolder: {subfolder_name}")
                             if isinstance(subfolder_data, dict) and "images" in subfolder_data and isinstance(subfolder_data["images"], list):
-                                print(f"      Images antes: {len(subfolder_data['images'])}")
+                                # print(f"      Images antes: {len(subfolder_data['images'])}")
                                 urls = [_to_url(str(fp)) for fp in subfolder_data["images"]]
                                 subfolder_data["images"] = [u for u in urls if u]
-                                print(f"      Images depois: {len(subfolder_data['images'])}")
+                                # print(f"      Images depois: {len(subfolder_data['images'])}")
                     # Estrutura antiga com images diretas
                     elif "images" in data and isinstance(data["images"], list):
-                        print(f"  Estrutura antiga - images diretas: {len(data['images'])}")
+                        # print(f"  Estrutura antiga - images diretas: {len(data['images'])}")
                         urls = [_to_url(str(fp)) for fp in data["images"]]
                         data["images"] = [u for u in urls if u]
         except Exception as e:
@@ -227,19 +230,19 @@ def run_predict():
             log.warning(f"Erro ao converter imagens para URLs: {e}")
         
         print(f"\nresults_summary DEPOIS da conversão:")
-        print(json.dumps(results_summary, indent=2, default=str)[:2000])
+        # print(json.dumps(results_summary, indent=2, default=str)[:2000])
         
         # Print específico das images arrays
-        print(f"\n>>> VERIFICAÇÃO FINAL DAS IMAGES:")
+        # print(f"\n>>> VERIFICAÇÃO FINAL DAS IMAGES:")
         for model, data in results_summary.items():
             if isinstance(data, dict) and "subfolders" in data:
                 for subfolder, subdata in data["subfolders"].items():
                     img_count = len(subdata.get("images", []))
-                    print(f"  {model}/{subfolder}: {img_count} images")
-                    if img_count > 0:
-                        print(f"    Primeira: {subdata['images'][0]}")
+                    # print(f"  {model}/{subfolder}: {img_count} images")
+                    # if img_count > 0:
+                        # print(f"    Primeira: {subdata['images'][0]}")
         
-        print(f"========== [FIM URL CONVERSION] ==========\n")
+        # print(f"========== [FIM URL CONVERSION] ==========\n")
         
         return jsonify({
             "status": "completed",

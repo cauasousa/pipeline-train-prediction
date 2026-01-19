@@ -792,6 +792,19 @@
             formData.append('models', JSON.stringify(selected));
             formData.append('source', 'upload');
 
+            // Coleta técnicas de pré-processamento selecionadas (mesma lógica do envio JSON)
+            let preprocessingPipeline = [];
+            if (global.PreprocessingPrediction && typeof global.PreprocessingPrediction.getPipeline === 'function') {
+                preprocessingPipeline = global.PreprocessingPrediction.getPipeline();
+            } else {
+                preprocessingPipeline = Array.from(
+                    document.querySelectorAll('#tipo-checkboxes-preprocessing input[type="checkbox"]:checked')
+                ).map(cb => cb.value);
+            }
+            if (preprocessingPipeline.length > 0) {
+                formData.append('preprocessing', JSON.stringify(preprocessingPipeline));
+            }
+
             // Adiciona os arquivos
             uploadedFiles.forEach(file => {
                 formData.append('files', file);
@@ -881,7 +894,7 @@
 
             for (const modelName of returnedModels) {
                 const modelData = res.results_summary[modelName];
-                console.log(`[DEBUG] Processando modelo: ${modelName}`, modelData);
+                // console.log(`[DEBUG] Processando modelo: ${modelName}`, modelData);
 
                 if (!modelData) {
                     console.warn(`[DEBUG] Modelo ${modelName} não tem dados`);
@@ -1749,6 +1762,15 @@
 
         if (page === 'predicao') {
             initPredictionPage();
+        }
+
+        if (page === 'analise') {
+            // --- Análise de Treino ---
+            if (global.TrainingAnalysis && typeof global.TrainingAnalysis.init === 'function') {
+                global.TrainingAnalysis.init();
+            } else {
+                console.error('[UI] Módulo TrainingAnalysis não foi carregado');
+            }
         }
     }
 

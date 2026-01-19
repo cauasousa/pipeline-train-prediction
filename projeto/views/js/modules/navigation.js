@@ -5,6 +5,7 @@
     const PAGES = {
         treinamento: 'treinamento.html',
         predicao: 'predicao.html',
+        analise: 'analise.html',
     };
 
     const cache = {};

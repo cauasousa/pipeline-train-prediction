@@ -27,10 +27,12 @@ try:
     from projeto.app.routes import training as training_mod
     from projeto.app.routes import prediction as prediction_mod
     from projeto.app.routes import preprocessing as preprocessing_mod
+    from projeto.app.routes import analysis as analysis_mod
     
     app.register_blueprint(training_mod.bp, url_prefix="/train")
     app.register_blueprint(prediction_mod.bp, url_prefix="/predict")
     app.register_blueprint(preprocessing_mod.bp, url_prefix="/api/preprocessing")
+    app.register_blueprint(analysis_mod.bp, url_prefix="/api/analysis")
 except Exception as e:
     print("Falha ao importar blueprints de projeto.app.routes:", e)
 

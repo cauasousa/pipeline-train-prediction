@@ -63,7 +63,13 @@ def apply_rotation(source_img, angle=30.0):
 
 def apply_gamma(source_img, gamma=1.0, gain=1):
     """Corrige o Gamma: valores > 1 escurecem, < 1 clareiam a imagem."""
+    # Trava de segurança para garantir uint8 0-255 antes de processar
+    if source_img.dtype != np.uint8 and source_img.max() <= 1.0:
+        source_img = (source_img * 255).astype(np.uint8)
+
     result = exposure.adjust_gamma(source_img, gamma=gamma, gain=gain)
+    if result.max() <= 1.0:
+        result = (result * 255).astype(np.uint8)
     print("✅ Gamma Correction aplicada com sucesso.")
     return result
 
@@ -81,10 +87,18 @@ def apply_sigmoid(source_img, cutoff=0.5, gain=10, inv=False):
 
 def apply_clahe(source_img, clip_limit=0.01):
     """CLAHE (Equalização de Histograma Adaptativa): melhora o contraste local sem ampliar ruído excessivo."""
+    is_color = len(source_img.shape) == 3
+
+    # O skimage espera float [0,1] para esta função específica
+    img_float = source_img.astype(np.float32) / 255.0
     # O CLAHE do skimage funciona melhor com floats ou imagens normalizadas
-    result = (exposure.equalize_adapthist(source_img / 255.0, clip_limit=clip_limit) * 255).astype(np.uint8)
+    if is_color:
+        # Aplica por canal para não estourar as cores
+        result = exposure.equalize_adapthist(img_float, clip_limit=clip_limit, kernel_size=None)
+    else:
+        result = exposure.equalize_adapthist(img_float, clip_limit=clip_limit)
     print("✅ CLAHE aplicada com sucesso.")
-    return result
+    return (result * 255).astype(np.uint8)
 
 def apply_equalize_hist(source_img):
     """Equalização de Histograma Global: espalha as intensidades por todo o espectro (0-255)."""
@@ -94,9 +108,13 @@ def apply_equalize_hist(source_img):
 
 def apply_rescale_intensity(source_img):
     """Rescale Intensity: estica o contraste (Stretching) baseando-se nos percentis da imagem."""
+    # Segurança: Se a imagem estiver em float (0-1) devido ao 'Normalizar', volta para 0-255
+    if source_img.dtype != np.uint8 and source_img.max() <= 1.0:
+        source_img = (source_img * 255).astype(np.uint8)
 
     p2, p98 = np.percentile(source_img, (2, 98))
-    result = exposure.rescale_intensity(source_img, in_range=(p2, p98))
+    result = exposure.rescale_intensity(source_img, in_range=(p2, p98), 
+        out_range=(0, 255)).astype(np.uint8)
     print(f"✅ Rescale Intensity aplicado com p2={p2}, p98={p98}.")
     return result
 
@@ -105,6 +123,10 @@ def apply_histogram_matching(source_img, reference_path=None):
     Se `reference_path` for informado, carrega a referência desse caminho; caso contrário, usa `reference_img` global.
     Normaliza o número de canais entre imagem e referência.
     """
+    # Se a imagem chegar normalizada (0-1), volta para 0-255
+    if source_img.max() <= 1.0 and source_img.dtype != np.uint8:
+        source_img = (source_img * 255).astype(np.uint8)
+
     ref = None
     if reference_path:
         try:
@@ -160,7 +182,7 @@ PREPROCESSING_REGISTRY = {
     "Redimensionar": lambda img: cv2.resize(img, (224, 224)),
     "Escala de Cinza": lambda img: cv2.cvtColor(img, cv2.COLOR_BGR2GRAY),
     "Equalizar Histograma": lambda img: cv2.equalizeHist(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)),
-    "Normalizar": lambda img: img / 255.0,
+    "Normalizar": lambda img: img.astype(np.float32) / 255.0,
     # Rotação parametrizável
     "Rotation": apply_rotation,
     "Gamma Correction": apply_gamma,
