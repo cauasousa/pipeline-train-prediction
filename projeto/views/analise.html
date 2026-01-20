@@ -1,158 +1,696 @@
-<div class="section" id="analysis-page">
+<style>
+    :root {
+        --background: #ffffff;
+        --foreground: #0f172a;
+        --card: #ffffff;
+        --card-foreground: #0f172a;
+        --primary: #2563eb;
+        --muted: #64748b;
+        --muted-foreground: #94a3b8;
+        --border: #e2e8f0;
+        --ring: #3b82f6;
+    }
 
-    <div class="section-header">
-        <span class="section-step">ANÁLISE</span>
-        <h3>📊 Análise Científica de Treinamento</h3>
-    </div>
+    #analysis-page {
+        font-family: 'Inter', system-ui, sans-serif;
+        background-color: #f8fafc;
+        padding: 2rem;
+        color: var(--foreground);
+    }
 
-    <div class="card" style="margin-bottom: 20px;">
-        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 15px;">
-            Análise estatística avançada dos resultados de treinamento
-        </p>
+    .analysis-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
 
-        <!-- Seleção de Treinos -->
-        <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px;">
-            <div>
-                <label for="analysis-mode" class="text-sm text-muted" style="font-weight: 600;">Modo de Análise:</label>
-                <select id="analysis-mode" class="input w-full mt-1" style="background: white;">
-                    <option value="single">Treino Individual</option>
-                    <option value="group">Grupo de Treinos (mesmo nome base)</option>
-                    <option value="all">Todos os Treinos</option>
-                </select>
-            </div>
+    .chart-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.25rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        transition: box-shadow 0.2s;
+    }
 
-            <div id="training-selection-container">
-                <label for="training-select" class="text-sm text-muted" style="font-weight: 600;">Selecione o
-                    Treino:</label>
-                <select id="training-select" class="input w-full mt-1" style="background: white;">
-                    <option value="">-- Carregando treinos --</option>
-                </select>
-            </div>
+    .chart-card:hover {
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
 
-            <div id="group-selection-container" class="hidden">
-                <label for="group-select" class="text-sm text-muted" style="font-weight: 600;">Selecione o Grupo (nome
-                    base):</label>
-                <select id="group-select" class="input w-full mt-1" style="background: white;">
-                    <option value="">-- Carregando grupos --</option>
-                </select>
-            </div>
+    .chart-header-content {
+        margin-bottom: 1.5rem;
+    }
+
+    .chart-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        letter-spacing: -0.025em;
+        margin-bottom: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .chart-title-sm {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .chart-description {
+        font-size: 0.875rem;
+        color: var(--muted);
+        line-height: 1.25rem;
+    }
+
+    .chart-desc-sm {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin-bottom: 1rem;
+    }
+
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-badge {
+        background: white;
+        border: 1px solid var(--border);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary);
+        display: block;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 600;
+    }
+
+    /* Inputs estilo Flowbite/shadcn */
+    .custom-select {
+        background-color: #f9fafb;
+        border: 1px solid #d1d5db;
+        color: #111827;
+        font-size: 0.875rem;
+        border-radius: 0.5rem;
+        padding: 0.625rem;
+        width: 100%;
+        outline: none;
+    }
+
+    .custom-select:focus {
+        border-color: var(--primary);
+        ring: 2px var(--primary);
+    }
+
+    .btn-generate {
+        background-color: var(--primary);
+        color: white;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        padding: 0.625rem 1.25rem;
+        transition: opacity 0.2s;
+        border: none;
+        cursor: pointer;
+        width: 100%;
+    }
+
+    .section-header-modern {
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .badge-step {
+        background: #2563eb;
+        color: white;
+        font-size: 0.65rem;
+        font-weight: 800;
+        padding: 0.25rem 0.6rem;
+        border-radius: 4px;
+        letter-spacing: 0.05em;
+    }
+
+    .badge-secondary {
+        background: #64748b;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin-top: 0.5rem;
+    }
+
+    .interpretation-box {
+        background: #f8fafc;
+        border-left: 4px solid #e2e8f0;
+        padding: 0.75rem;
+        font-size: 0.85rem;
+        color: #475569;
+        margin-top: 0.5rem;
+        border-radius: 0 4px 4px 0;
+    }
+
+    /* Reduce spacing between paragraphs inside interpretation boxes */
+    .interpretation-box p {
+        margin: 0.2rem 0;
+        line-height: 1.2;
+    }
+
+    .canvas-container {
+        height: 400px;
+        width: 100%;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .canvas-container-sm {
+        height: 280px;
+        width: 100%;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .canvas-container canvas,
+    .canvas-container-sm canvas {
+        max-width: 100%;
+        max-height: 100%;
+    }
+
+    .hidden {
+        display: none;
+    }
+
+    /* Tooltip info styles */
+    .info-tooltip {
+        position: relative;
+        display: inline-flex;
+        color: var(--text-muted, #636E72);
+        cursor: help;
+        transition: color 0.2s;
+        z-index: 9999;
+    }
+
+    .info-tooltip:hover {
+        color: var(--color-primary, #4A90E2);
+    }
+
+    .info-tooltip svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .info-tooltip .tooltip-content {
+        position: absolute;
+        bottom: calc(100% + 12px);
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: var(--color-primary, #4A90E2);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 8px;
+        font-size: 12px;
+        padding: 12px 14px;
+        box-shadow: 0 10px 30px -5px rgba(74, 144, 226, 0.35), 0 2px 8px rgba(0, 0, 0, 0.1);
+        white-space: normal;
+        max-width: 320px;
+        min-width: 280px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+        z-index: 99999;
+        line-height: 1.5;
+    }
+
+    .info-tooltip:hover .tooltip-content {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .info-tooltip .tooltip-content::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: var(--color-primary, #4A90E2);
+    }
+
+    /* Tooltip internal sections */
+    .tooltip-section {
+        margin-bottom: 10px;
+    }
+
+    .tooltip-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .tooltip-section.alert {
+        background-color: rgba(255, 255, 255, 0.15);
+        border-left: 3px solid #FFD93D;
+        padding: 8px 10px;
+        border-radius: 4px;
+        margin-top: 8px;
+    }
+
+    .tooltip-title {
+        display: block;
+        font-size: 11px;
+        font-weight: 700;
+        margin-bottom: 5px;
+        color: #E3F2FF;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .tooltip-section.alert .tooltip-title {
+        color: #FFD93D;
+    }
+
+    .tooltip-section p {
+        margin: 3px 0;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #ffffff;
+    }
+
+    .tooltip-divider {
+        height: 1px;
+        background: rgba(255, 255, 255, 0.25);
+        margin: 10px 0;
+    }
+</style>
+<div id="analysis-page">
+
+    <div class="section" style="margin-bottom: 2rem;">
+
+        <div>
+            <h3 style="font-size: 1.5rem; font-weight: 700; color: #0f172a; margin-top: 0.5rem;">Análise
+                do Treinamento</h3>
         </div>
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem;">
+            <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 15px;">
+                Análise estatística avançada dos resultados de treinamento
+            </p>
 
-        <button class="btn btn-primary" id="run-analysis-btn"
-            style="font-size: 1rem; font-weight: 700; padding: 10px 18px; width: 100%;">
-            📊 Gerar Análise
-        </button>
+            <!-- Seleção de Treinos -->
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 15px;">
+                <div>
+                    <label for="analysis-mode" style="font-weight: 600; font-size: 0.875rem; color: #64748b;">Modo de
+                        Análise:</label>
+                    <select id="analysis-mode" class="custom-select" style="background: white; margin-top: 8px;">
+                        <option value="single">Treino Individual</option>
+                        <option value="group">Grupo de Treinos (mesmo nome base)</option>
+                        <option value="all">Todos os Treinos</option>
+                    </select>
+                </div>
+
+                <div id="training-selection-container">
+                    <label for="training-select"
+                        style="font-weight: 600; font-size: 0.875rem; color: #64748b;">Selecione o Treino:</label>
+                    <select id="training-select" class="custom-select" style="background: white; margin-top: 8px;">
+                        <option value="">-- Carregando treinos --</option>
+                    </select>
+                </div>
+
+                <div id="group-selection-container" class="hidden">
+                    <label for="group-select" style="font-weight: 600; font-size: 0.875rem; color: #64748b;">Selecione o
+                        Grupo:</label>
+                    <select id="group-select" class="custom-select" style="background: white; margin-top: 8px;">
+                        <option value="">-- Carregando grupos --</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="btn-generate" id="run-analysis-btn">
+                📊 Gerar Análise
+            </button>
+        </div>
     </div>
 
     <!-- Resultados da Análise -->
-    <div id="analysis-results" style="display: none;">
+    <div id="analysis-results" style="display: none; margin-top: 2rem;">
 
-        <!-- Informações do Treino -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0; color: var(--primary);">ℹ️ Informações do Treino</h4>
-            <div id="training-info" style="font-size: 0.9rem; color: #666;"></div>
+        <div id="training-info" class="stats-container"></div>
+
+        <div class="section-header-modern">
+            <h3 class="section-title">Análise de Performance Central</h3>
         </div>
 
-        <!-- Gráficos Principais (Texto Principal) -->
-        <div class="section-header" style="margin-top: 20px;">
-            <span class="section-step">PRINCIPAIS</span>
-            <h3>Gráficos para Texto Principal</h3>
+        <div class="analysis-grid">
+            <div class="chart-card">
+                <div class="chart-header-content">
+                    <h4 class="chart-title">
+                        Curva de Loss
+                        <div class="info-tooltip">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                                <path
+                                    d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                            </svg>
+                            <span class="tooltip-content">
+                                <div class="tooltip-section">
+                                    <strong class="tooltip-title">O que observar</strong>
+                                    <p>A <b>Train Loss</b> indica o quão bem o modelo aprende os dados. A <b>Val
+                                            Loss</b> indica a capacidade de prever dados novos.</p>
+                                </div>
+
+                                <div class="tooltip-divider"></div>
+
+                                <div class="tooltip-section alert">
+                                    <strong class="tooltip-title">Alerta de Overfitting</strong>
+                                    <p>Se a linha de Validação subir enquanto a de Treino desce, o modelo está
+                                        memorizando ruído. Recomenda-se interromper o treino.</p>
+                                </div>
+                            </span>
+                        </div>
+                    </h4>
+                </div>
+                <div class="canvas-container-sm"><canvas id="chart-loss"></canvas></div>
+                <div class="interpretation-box">
+                    <strong>Interpreta:</strong>
+                    <p>Convergência. Linhas próximas = boa generalização.</p>
+                    <p>Val subindo = overfitting.</p>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-header-content">
+                    <h4 class="chart-title">
+                        GAP de Generalização (gap = val/loss − train/loss)
+                        <div class="info-tooltip">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                                <path
+                                    d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                            </svg>
+                            <span class="tooltip-content">
+                                <div class="tooltip-section">
+                                    <strong class="tooltip-title">O que observar</strong>
+                                    <p>Representa a diferença de erro entre o conjunto de treinamento e validação. O
+                                        ideal é que o Gap seja <b>pequeno e estável</b>.</p>
+                                </div>
+                                <div class="tooltip-divider"></div>
+                                <div class="tooltip-section alert">
+                                    <strong class="tooltip-title">Valores Negativos</strong>
+                                    <p>Valores abaixo de zero indicam que a validação está melhor que o treino. Isso é
+                                        comum se houver "Dropout" ou "Augmentation" pesados no treinamento.</p>
+                                </div>
+                            </span>
+                        </div>
+                    </h4>
+                </div>
+                <div class="canvas-container-sm"><canvas id="chart-gap"></canvas></div>
+                <div class="interpretation-box" style="margin-top: 0.75rem;">
+                    <strong>Interpreta:</strong>
+                    <p>Gap pequeno e estável → modelo robusto</p>
+                    <p>Gap crescente → memoriza treino</p>
+                </div>
+            </div>
+
+
         </div>
 
-        <!-- 1. Loss (Train × Val) -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0;">1️⃣ Curva de Loss (Treino × Validação)</h4>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">
-                <strong>Interpreta:</strong> Convergência do modelo. Linhas próximas = boa generalização. Val subindo +
-                Train caindo = overfitting.
-            </p>
-            <canvas id="chart-loss" style="max-height: 400px;"></canvas>
+        <div class="section-header-modern" style="margin-top: 4rem;">
+            <span class="badge-step badge-secondary">Accuracy</span>
+            <!-- <h3 class="section-title"></h3> -->
         </div>
 
-        <!-- 2. Gap de Generalização -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0;">2️⃣ Gap de Generalização (val_loss − train_loss)</h4>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">
-                <strong>Interpreta:</strong> Quanto o modelo "descola" do treino. Gap pequeno = robusto. Gap crescente =
-                memorização.
-            </p>
-            <canvas id="chart-gap" style="max-height: 400px;"></canvas>
+        <div class="analysis-grid">
+            <div class="chart-card">
+                <div class="chart-header-content">
+                    <h4 class="chart-title">
+                        Accuracy Top-1 × Epoch
+                        <div class="info-tooltip">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                                <path
+                                    d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                            </svg>
+                            <span class="tooltip-content">
+                                <div class="tooltip-section">
+                                    <strong class="tooltip-title">O que observar</strong>
+                                    <p>Mede a porcentagem de vezes que a classe de maior probabilidade é a correta.
+                                        Indica a <b>velocidade de aprendizado</b> real.</p>
+                                </div>
+                                <div class="tooltip-divider"></div>
+                                <div class="tooltip-section alert">
+                                    <strong class="tooltip-title">Platô Precoce</strong>
+                                    <p>Se a acurácia parar de subir muito cedo, pode haver limitação no volume de dados
+                                        ou o modelo atingiu sua capacidade máxima.</p>
+                                </div>
+                            </span>
+                        </div>
+                    </h4>
+                    <p class="chart-desc-sm">Velocidade de aprendizado e Saturação do modelo.</p>
+                </div>
+                <div class="canvas-container-sm"><canvas id="chart-acc-top1"></canvas></div>
+                <div class="interpretation-box">
+                    <strong>Interpreta:</strong>
+                    <p>Crescimento rápido → classes fáceis</p>
+                    <p>Platô precoce → limitação do
+                        modelo/dados</p>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h4 class="chart-title-sm">
+                    Accuracy Top-5 x Epoch
+                    <div class="info-tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path
+                                d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                        </svg>
+                        <span class="tooltip-content">
+                            <div class="tooltip-section">
+                                <strong class="tooltip-title">O que observar</strong>
+                                <p>Mede se a classe correta está entre as 5 principais previsões. Útil para verificar se
+                                    o modelo está "chegando perto" em classes difíceis.</p>
+                            </div>
+                            <div class="tooltip-divider"></div>
+                            <div class="tooltip-section">
+                                <strong class="tooltip-title">Dica Técnica</strong>
+                                <p>Um Top-5 alto com um Top-1 baixo indica que o modelo confunde o objeto com classes
+                                    visualmente muito parecidas.</p>
+                            </div>
+                        </span>
+                    </div>
+                </h4>
+                <p class="chart-desc-sm">Capacidade de chegar perto da classe correta.</p>
+                <div class="canvas-container-sm"><canvas id="chart-acc-top5"></canvas></div>
+                <div class="interpretation-box">
+                    <strong>Interpreta:</strong>
+                    <p>Top-5 alto e Top-1 baixo → classes semelhantes entre si</p>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h4 class="chart-title-sm">
+                    Diferença (ΔTop5-Top1)
+                    <div class="info-tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path
+                                d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                        </svg>
+                        <span class="tooltip-content">
+                            <div class="tooltip-section">
+                                <strong class="tooltip-title">O que observar</strong>
+                                <p>Mede o <b>grau de ambiguidade</b>. Um Delta pequeno indica que o modelo tem alta
+                                    certeza na primeira escolha.</p>
+                            </div>
+                            <div class="tooltip-divider"></div>
+                            <div class="tooltip-section alert">
+                                <strong class="tooltip-title">Delta Grande</strong>
+                                <p>Se a diferença for muito alta, as classes do seu dataset podem não estar bem
+                                    distintas ou os rótulos estão inconsistentes.</p>
+                            </div>
+                        </span>
+                    </div>
+                </h4>
+                <p class="chart-desc-sm">Grau de ambiguidade entre classes</p>
+                <div class="canvas-container-sm"><canvas id="chart-delta-acc"></canvas></div>
+                <div class="interpretation-box">
+                    <strong>Interpreta:</strong>
+                    <p>Δ grande → classes visualmente parecidas</p>
+                    <p>Δ pequeno → separação clara</p>
+                </div>
+            </div>
+
         </div>
 
-        <!-- 3. Accuracy Top-1 -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0;">3️⃣ Accuracy Top-1 × Epoch</h4>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">
-                <strong>Interpreta:</strong> Velocidade de aprendizado. Platô precoce = limitação do modelo/dados.
-            </p>
-            <canvas id="chart-acc-top1" style="max-height: 400px;"></canvas>
+        <div class="section-header-modern" style="margin-top: 4rem;">
+            <span class="badge-step badge-secondary">APÊNDICE</span>
+            <h3 class="section-title">Análises Complementares</h3>
         </div>
 
-        <!-- Gráficos Complementares (Apêndice) -->
-        <div class="section-header" style="margin-top: 30px;">
-            <span class="section-step">COMPLEMENTARES</span>
-            <h3>Gráficos para Apêndice</h3>
-        </div>
+        <div class="analysis-grid">
 
-        <!-- 4. Accuracy Top-5 -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0;">4️⃣ Accuracy Top-5 × Epoch</h4>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">
-                <strong>Interpreta:</strong> Capacidade de "chegar perto" da classe. Top-5 alto + Top-1 baixo = classes
-                semelhantes.
-            </p>
-            <canvas id="chart-acc-top5" style="max-height: 400px;"></canvas>
-        </div>
+            <div class="chart-card">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <h4 class="chart-title-sm" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                        Estabilidade de Treino
+                        <div class="info-tooltip">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                                <path
+                                    d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                            </svg>
+                            <span class="tooltip-content">
+                                <div class="tooltip-section">
+                                    <strong class="tooltip-title">O que observar</strong>
+                                    <p>Mede a oscilação do aprendizado em uma janela móvel (últimas 10 épocas).
+                                        Variância baixa indica <b>convergência sólida</b>.</p>
+                                </div>
+                                <div class="tooltip-divider"></div>
+                                <div class="tooltip-section alert">
+                                    <strong class="tooltip-title">Alta Variância</strong>
+                                    <p>Picos frequentes indicam um treinamento instável. Considere reduzir a Taxa de
+                                        Aprendizado (Learning Rate).</p>
+                                </div>
+                            </span>
+                        </div>
+                    </h4>
 
-        <!-- 5. Diferença Top-5 − Top-1 -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0;">5️⃣ Diferença Top-5 − Top-1 (Ambiguidade)</h4>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">
-                <strong>Interpreta:</strong> Grau de ambiguidade. Δ grande = classes parecidas. Δ pequeno = separação
-                clara.
-            </p>
-            <canvas id="chart-delta-acc" style="max-height: 400px;"></canvas>
-        </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <label for="window-size-input"
+                            style="font-size: 0.75rem; color: #64748b; white-space: nowrap;">Janela:</label>
+                        <input type="number" id="window-size-input" min="2" max="20" value="5"
+                            style="width: 50px; padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-size: 0.875rem; text-align: center;" />
+                        <span style="font-size: 0.75rem; color: #94a3b8;">épocas</span>
+                    </div>
+                </div>
+                <p class="chart-desc-sm">Oscilação do aprendizado</p>
 
-        <!-- 6. Estabilidade (Variância) -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0;">6️⃣ Estabilidade do Treino (Variância - Janela 10 epochs)</h4>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">
-                <strong>Interpreta:</strong> Oscilação do aprendizado. Alta variância = instável. Baixa variância =
-                convergência sólida.
-            </p>
-            <canvas id="chart-stability" style="max-height: 400px;"></canvas>
-        </div>
+                <div class="canvas-container-sm"><canvas id="chart-stability"></canvas></div>
+                <div class="interpretation-box">
+                    <strong>Interpreta:</strong>
+                    <p>Linha Vermelha subindo → Erro oscilando (diminuir <i>Learning Rate (LR)</i>)</p>
+                    <p>Linha Verde com picos → Predições imprevisíveis (verificar dados)</p>
+                    <p>Ambas descendo → Aprendizado consistente (saudável)</p>
+                    <p>Ambas perto de zero → Modelo estabilizou (pode parar treino)</p>
+                </div>
+            </div>
 
-        <!-- 7. Learning Rate Schedule -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0;">7️⃣ Learning Rate Schedule</h4>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">
-                <strong>Interpreta:</strong> Evolução do otimizador. Queda brusca = refinamento fino. LR alto com loss
-                alto = instabilidade.
-            </p>
-            <canvas id="chart-lr" style="max-height: 400px;"></canvas>
-        </div>
 
-        <!-- 8. Tempo por Epoch -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0;">8️⃣ Tempo por Epoch (Eficiência)</h4>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">
-                <strong>Interpreta:</strong> Custo computacional. Tempo constante = estável. Picos = gargalo I/O/GPU.
-            </p>
-            <canvas id="chart-time" style="max-height: 400px;"></canvas>
-        </div>
 
-        <!-- 9. Correlação Accuracy × Loss -->
-        <div class="card" style="margin-bottom: 20px;">
-            <h4 style="margin: 0 0 12px 0;">9️⃣ Correlação Accuracy × Loss</h4>
-            <p style="font-size: 0.85rem; color: #666; margin-bottom: 12px;">
-                <strong>Interpreta:</strong> Relação entre erro e acerto. Correlação negativa forte = saudável. Disperso
-                = inconsistente.
-            </p>
-            <canvas id="chart-correlation" style="max-height: 400px;"></canvas>
-        </div>
+            <div class="chart-card">
+                <h4 class="chart-title-sm">
+                    Learning Rate Schedule
+                    <div class="info-tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path
+                                d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                        </svg>
+                        <span class="tooltip-content">
+                            <div class="tooltip-section">
+                                <strong class="tooltip-title">O que observar</strong>
+                                <p>Mostra como o otimizador ajusta o "passo" do aprendizado. pg0, pg1 e pg2 regulam
+                                    Bias, Pesos e Normalização separadamente.</p>
+                            </div>
+                            <div class="tooltip-divider"></div>
+                            <div class="tooltip-section">
+                                <strong class="tooltip-title">Refinamento Fino</strong>
+                                <p>A queda brusca da LR no final serve para o modelo estabilizar nos melhores pesos
+                                    possíveis (ajuste fino).</p>
+                            </div>
+                        </span>
+                    </div>
+                </h4>
+                <p class="chart-desc-sm">Evolução do otimizador e refinamento fino.</p>
+                <div class="canvas-container-sm"><canvas id="chart-lr"></canvas></div>
+                <div class="interpretation-box">
+                    <strong>Interpreta:</strong>
+                    <p>Queda brusca de LR → refinamento fino</p>
+                    <p>LR alto com loss alto → possível instabilidade</p>
+                </div>
+            </div>
 
+            <div class="chart-card">
+                <h4 class="chart-title-sm">
+                    Eficiência (Tempo/Epoch)
+                    <div class="info-tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path
+                                d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                        </svg>
+                        <span class="tooltip-content">
+                            <div class="tooltip-section">
+                                <strong class="tooltip-title">O que observar</strong>
+                                <p>Monitora o custo computacional. O tempo deve ser <b>quase constante</b> durante todo
+                                    o treinamento.</p>
+                            </div>
+                            <div class="tooltip-divider"></div>
+                            <div class="tooltip-section alert">
+                                <strong class="tooltip-title">Picos de Tempo</strong>
+                                <p>Picos isolados indicam gargalos de leitura de disco (I/O) ou momentos em que o
+                                    sistema está salvando o modelo no Drive.</p>
+                            </div>
+                        </span>
+                    </div>
+                </h4>
+                <p class="chart-desc-sm">Custo computacional e possíveis gargalos de GPU.</p>
+                <div class="canvas-container-sm"><canvas id="chart-time"></canvas></div>
+                <div class="interpretation-box">
+                    <strong>Interpreta:</strong>
+                    <p>Treino estável → tempo quase constante</p>
+                    <p>Picos → gargalo de I/O ou GPU</p>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <h4 class="chart-title-sm">
+                    Correlação Acc × Loss
+                    <div class="info-tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path
+                                d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                        </svg>
+                        <span class="tooltip-content">
+                            <div class="tooltip-section">
+                                <strong class="tooltip-title">O que observar</strong>
+                                <p>Relação direta entre erro (Loss) e acerto (Acc). Uma <b>correlação negativa forte</b>
+                                    (reta descendo) é o sinal de um modelo saudável.</p>
+                            </div>
+                            <div class="tooltip-divider"></div>
+                            <div class="tooltip-section alert">
+                                <strong class="tooltip-title">Pontos Dispersos</strong>
+                                <p>Pontos espalhados sem uma direção clara indicam que o aprendizado foi inconsistente
+                                    ou ruidoso.</p>
+                            </div>
+                        </span>
+                    </div>
+                </h4>
+                <p class="chart-desc-sm">Saúde do modelo: Correlação negativa forte é o ideal.</p>
+                <div class="canvas-container-sm"><canvas id="chart-correlation"></canvas></div>
+                <div class="interpretation-box">
+                    <strong>Interpreta:</strong>
+                    <p>Correlação negativa forte → modelo saudável</p>
+                    <p>Pontos dispersos → aprendizado inconsistente</p>
+                </div>
+            </div>
+        </div>
     </div>
-
-</div>

@@ -10,6 +10,27 @@ bp = Blueprint("analysis", __name__)
 # Path base dos resultados de treinamento
 RESULTS_BASE_PATH = Path(r"M:\content\drive\MyDrive\pipeline\yolo_classificacao_resultados")
 
+# Helpers para leitura robusta de colunas do CSV
+def pick_float(row: dict, candidates, default: float = 0.0) -> float:
+    """Tenta obter um float de 'row' usando uma lista de nomes candidatos.
+    Faz correspondência case-insensitive nas chaves do CSV.
+    """
+    if not row:
+        return default
+    # Normaliza chaves para comparação case-insensitive
+    lower = {str(k).strip().lower(): str(v).strip() for k, v in row.items()}
+    for name in candidates:
+        key = str(name).strip().lower()
+        if key in lower:
+            val_str = lower[key]
+            if val_str and val_str not in (None, ""):
+                try:
+                    return float(val_str)
+                except (ValueError, TypeError) as e:
+                    log.warning(f"Failed to convert '{key}'='{val_str}' to float: {e}")
+                    continue
+    return default
+
 @bp.route("/list-trainings", methods=["GET"])
 def list_trainings():
     """
@@ -77,19 +98,42 @@ def get_training_data(training_name):
 
         with open(training_path, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
+            row_count = 0
             for row in reader:
+                row_count += 1
                 # Remove espaços das chaves
                 row = {k.strip(): v.strip() for k, v in row.items()}
 
+                # Debug: log first row
+                if row_count == 1:
+                    log.info(f"[{training_name}] CSV Headers: {list(row.keys())}")
+                    log.info(f"[{training_name}] Raw values: train/loss={row.get('train/loss')}, val/loss={row.get('val/loss')}")
+
                 data["epochs"].append(int(row.get("epoch", 0)))
-                data["train_loss"].append(float(row.get("train/loss", 0)))
-                data["val_loss"].append(float(row.get("val/loss", 0)))
-                data["acc_top1"].append(float(row.get("metrics/accuracy_top1", 0)))
-                data["acc_top5"].append(float(row.get("metrics/accuracy_top5", 0)))
-                data["lr_pg0"].append(float(row.get("lr/pg0", 0)))
-                data["lr_pg1"].append(float(row.get("lr/pg1", 0)))
-                data["lr_pg2"].append(float(row.get("lr/pg2", 0)))
-                data["time"].append(float(row.get("time", 0)))
+                # Loss com chaves alternativas
+                train_loss_val = pick_float(row, [
+                    "train/loss", "train_loss", "train/cls_loss", "train/class_loss", "train/loss_total"
+                ], 0.0)
+                val_loss_val = pick_float(row, [
+                    "val/loss", "val_loss", "val/cls_loss", "val/class_loss", "val/loss_total"
+                ], 0.0)
+                if row_count == 1:
+                    log.info(f"[{training_name}] Parsed train_loss={train_loss_val}, val_loss={val_loss_val}")
+                data["train_loss"].append(train_loss_val)
+                data["val_loss"].append(val_loss_val)
+                # Demais métricas (mantém principal e tenta alternativas básicas)
+                data["acc_top1"].append(pick_float(row, [
+                    "metrics/accuracy_top1", "accuracy_top1", "val/acc", "val/accuracy"
+                ], 0.0))
+                data["acc_top5"].append(pick_float(row, [
+                    "metrics/accuracy_top5", "accuracy_top5"
+                ], 0.0))
+                data["lr_pg0"].append(pick_float(row, ["lr/pg0", "lr_pg0"], 0.0))
+                data["lr_pg1"].append(pick_float(row, ["lr/pg1", "lr_pg1"], 0.0))
+                data["lr_pg2"].append(pick_float(row, ["lr/pg2", "lr_pg2"], 0.0))
+                data["time"].append(pick_float(row, ["time"], 0.0))
+
+            log.info(f"[{training_name}] Processed {row_count} rows. train_loss[:3]={data['train_loss'][:3]}, val_loss[:3]={data['val_loss'][:3]}")
 
         log.info(f"Dados carregados para {training_name}: {len(data['epochs'])} epochs")
         return jsonify(data), 200
@@ -139,18 +183,31 @@ def get_group_data(group_name):
 
             with open(training_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
+                row_count = 0
                 for row in reader:
+                    row_count += 1
                     row = {k.strip(): v.strip() for k, v in row.items()}
 
+                    if row_count == 1:
+                        log.info(f"[{training_name}] CSV Headers: {list(row.keys())}")
+
                     data["epochs"].append(int(row.get("epoch", 0)))
-                    data["train_loss"].append(float(row.get("train/loss", 0)))
-                    data["val_loss"].append(float(row.get("val/loss", 0)))
-                    data["acc_top1"].append(float(row.get("metrics/accuracy_top1", 0)))
-                    data["acc_top5"].append(float(row.get("metrics/accuracy_top5", 0)))
-                    data["lr_pg0"].append(float(row.get("lr/pg0", 0)))
-                    data["lr_pg1"].append(float(row.get("lr/pg1", 0)))
-                    data["lr_pg2"].append(float(row.get("lr/pg2", 0)))
-                    data["time"].append(float(row.get("time", 0)))
+                    data["train_loss"].append(pick_float(row, [
+                        "train/loss", "train_loss", "train/cls_loss", "train/class_loss", "train/loss_total"
+                    ], 0.0))
+                    data["val_loss"].append(pick_float(row, [
+                        "val/loss", "val_loss", "val/cls_loss", "val/class_loss", "val/loss_total"
+                    ], 0.0))
+                    data["acc_top1"].append(pick_float(row, [
+                        "metrics/accuracy_top1", "accuracy_top1", "val/acc", "val/accuracy"
+                    ], 0.0))
+                    data["acc_top5"].append(pick_float(row, [
+                        "metrics/accuracy_top5", "accuracy_top5"
+                    ], 0.0))
+                    data["lr_pg0"].append(pick_float(row, ["lr/pg0", "lr_pg0"], 0.0))
+                    data["lr_pg1"].append(pick_float(row, ["lr/pg1", "lr_pg1"], 0.0))
+                    data["lr_pg2"].append(pick_float(row, ["lr/pg2", "lr_pg2"], 0.0))
+                    data["time"].append(pick_float(row, ["time"], 0.0))
 
             group_data.append(data)
 

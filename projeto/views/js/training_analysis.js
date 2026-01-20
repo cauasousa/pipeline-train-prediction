@@ -8,7 +8,7 @@
     const TrainingAnalysis = {
         charts: {},
         currentData: null,
-        mode: 'publication', // 'exploration' | 'publication'
+        mode: 'exploration', // 'exploration' | 'publication'
         selectedRuns: new Set(), // para exploração: trackear runs selecionados
 
         // Interpretações científicas para cada métrica
@@ -22,6 +22,34 @@
             lr: 'Queda brusca → refinamento fino\nLR alto + loss alto → possível instabilidade',
             time: 'Tempo constante → treino estável\nPicos → gargalo I/O ou GPU',
             correlation: 'Correlação negativa → modelo saudável\nPontos dispersos → aprendizado inconsistente'
+        },
+
+        // Plugin simples para rótulos em cima dos pontos
+        pointValuePlugin: {
+            id: 'pointValuePlugin',
+            afterDatasetsDraw(chart, args, options) {
+                if (!options?.enabled) return;
+                const { ctx } = chart;
+                ctx.save();
+                ctx.font = options.font || '10px Inter, sans-serif';
+                ctx.fillStyle = options.color || '#475569';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+
+                chart.data.datasets.forEach((dataset, datasetIndex) => {
+                    const meta = chart.getDatasetMeta(datasetIndex);
+                    if (!meta || !meta.data) return;
+                    meta.data.forEach((element, index) => {
+                        const value = dataset.data?.[index];
+                        if (value === null || value === undefined) return;
+                        const text = options.formatter ? options.formatter(value) : value;
+                        const { x, y } = element.tooltipPosition();
+                        ctx.fillText(text, x, y - 6);
+                    });
+                });
+
+                ctx.restore();
+            }
         },
 
         init() {
@@ -40,60 +68,11 @@
         },
 
         setupVisualizationMode() {
-            const resultsDiv = document.getElementById('analysis-results');
-            if (!resultsDiv) return;
-
-            const infoDiv = document.getElementById('training-info');
-            if (!infoDiv) return;
-
-            // Criar container de controles
-            const controls = document.createElement('div');
-            controls.style.cssText = `
-                display: flex;
-                gap: 24px;
-                align-items: center;
-                justify-content: space-between;
-                padding: 16px 0;
-                border-bottom: 2px solid #f0f0f0;
-                margin-bottom: 20px;
-            `;
-
-            // Toggle de modo
-            const modeToggle = document.createElement('div');
-            modeToggle.style.cssText = `
-                display: flex;
-                gap: 12px;
-                align-items: center;
-            `;
-            modeToggle.innerHTML = `
-                <span style="font-size: 0.9rem; font-weight: 600; color: #333;">Visualização:</span>
-                <button id="mode-publication" class="mode-btn" style="padding: 8px 16px; border: 2px solid #3b82f6; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-weight: 600;">📄 Publicação</button>
-                <button id="mode-exploration" class="mode-btn" style="padding: 8px 16px; border: 2px solid #ccc; background: white; color: #333; border-radius: 6px; cursor: pointer; font-weight: 600;">🔍 Exploração</button>
-            `;
-
-            controls.appendChild(modeToggle);
-            infoDiv.parentElement.insertBefore(controls, infoDiv);
-
-            // Event listeners para toggle
-            document.getElementById('mode-publication')?.addEventListener('click', () => this.setVisualizationMode('publication'));
-            document.getElementById('mode-exploration')?.addEventListener('click', () => this.setVisualizationMode('exploration'));
+            // Configuração removida - modo fixo em 'publication'
         },
 
         setVisualizationMode(newMode) {
             this.mode = newMode;
-
-            // Atualizar botões
-            const pubBtn = document.getElementById('mode-publication');
-            const expBtn = document.getElementById('mode-exploration');
-
-            if (newMode === 'publication') {
-                pubBtn.style.cssText = 'padding: 8px 16px; border: 2px solid #3b82f6; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-weight: 600;';
-                expBtn.style.cssText = 'padding: 8px 16px; border: 2px solid #ccc; background: white; color: #333; border-radius: 6px; cursor: pointer; font-weight: 600;';
-            } else {
-                pubBtn.style.cssText = 'padding: 8px 16px; border: 2px solid #ccc; background: white; color: #333; border-radius: 6px; cursor: pointer; font-weight: 600;';
-                expBtn.style.cssText = 'padding: 8px 16px; border: 2px solid #3b82f6; background: #3b82f6; color: white; border-radius: 6px; cursor: pointer; font-weight: 600;';
-            }
-
             // Re-renderizar
             if (this.currentData) this.renderAnalysis();
         },
@@ -243,67 +222,89 @@
             this.renderAnalysis();
         },
 
+        // Dentro do objeto TrainingAnalysis...
+
         renderAnalysis() {
             const resultsDiv = document.getElementById('analysis-results');
             if (!resultsDiv || !this.currentData) return;
 
             resultsDiv.style.display = 'block';
-            this.renderTrainingInfo();
+            this.renderTrainingInfo(); // Renderiza os badges de topo
 
-            // Destruir gráficos antigos
-            Object.values(this.charts).forEach(chart => {
-                if (chart && typeof chart.destroy === 'function') {
-                    chart.destroy();
-                }
+            // Destruir antigos e renderizar novos
+            const chartConfigs = [
+                { id: 'loss', func: 'renderLossChart' },
+                { id: 'gap', func: 'renderGapChart' },
+                { id: 'acc_top1', func: 'renderAccTop1Chart' },
+                { id: 'acc_top5', func: 'renderAccTop5Chart' },
+                { id: 'delta_acc', func: 'renderDeltaAccChart' },
+                { id: 'stability', func: 'renderStabilityChart' },
+                { id: 'lr', func: 'renderLRChart' },
+                { id: 'mini_area', func: 'renderMiniAreaChart' },
+                { id: 'time', func: 'renderTimeChart' },
+                { id: 'correlation', func: 'renderCorrelationChart' }
+            ];
+
+            chartConfigs.forEach(cfg => {
+                if (this.charts[cfg.id]) this.charts[cfg.id].destroy();
+                this[cfg.func]();
             });
-            this.charts = {};
 
-            // Renderizar gráficos
-            this.renderLossChart();
-            this.renderGapChart();
-            this.renderAccTop1Chart();
-            this.renderAccTop5Chart();
-            this.renderDeltaAccChart();
-            this.renderStabilityChart();
-            this.renderLRChart();
-            this.renderTimeChart();
-            this.renderCorrelationChart();
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        },
 
-            resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Exemplo de configuração para o Gráfico 9 (Correlação) com visual moderno
+        renderCorrelationChart() {
+            const ctx = document.getElementById('chart-correlation')?.getContext('2d');
+            if (!ctx) return;
+
+            const datasets = this.currentData.map((data, idx) => ({
+                label: data.training_name,
+                data: data.val_loss.map((loss, i) => ({ x: loss, y: data.acc_top1[i] })),
+                backgroundColor: 'rgba(37, 99, 235, 0.5)',
+                borderColor: '#2563eb',
+                pointRadius: 3,
+                pointHoverRadius: 6
+            }));
+
+            this.charts['correlation'] = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets },
+                options: this.getChartOptions('Accuracy', this.mode, {
+                    scales: {
+                        x: { title: { display: true, text: 'Loss' } },
+                        y: { title: { display: true, text: 'Accuracy' }, min: 0, max: 1 }
+                    }
+                })
+            });
         },
 
         renderTrainingInfo() {
             const infoDiv = document.getElementById('training-info');
-            if (!infoDiv || !this.currentData) return;
+            if (!infoDiv || !this.currentData || this.currentData.length === 0) return;
 
             const numTrainings = this.currentData.length;
             const avgEpochs = Math.round(
-                this.currentData.reduce((sum, d) => sum + d.epochs.length, 0) / numTrainings
+                this.currentData.reduce((sum, d) => sum + (d.epochs?.length || 0), 0) / numTrainings
             );
+            const primary = this.currentData[this.getPrimaryRunIndex()] || this.currentData[0];
 
-            let html = `
+            infoDiv.innerHTML = `
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; padding: 16px 0;">
                     <div style="font-size: 0.95rem;">
-                        <span style="color: #666;">Treinos Analisados:</span>
-                        <span style="font-weight: 700; font-size: 1.2rem; color: #3b82f6; display: block;">📊 ${numTrainings}</span>
-                    </div>
-                    <div style="font-size: 0.95rem;">
-                        <span style="color: #666;">Epochs Médios:</span>
-                        <span style="font-weight: 700; font-size: 1.2rem; color: #10b981; display: block;">⏱️ ${avgEpochs}</span>
-                    </div>
-            `;
-
-            if (numTrainings === 1 && this.currentData[0].training_name) {
-                html += `
-                    <div style="font-size: 0.95rem;">
                         <span style="color: #666;">Nome do Treino:</span>
-                        <span style="font-weight: 700; font-size: 1rem; color: #333; display: block;">🏷️ ${this.currentData[0].training_name}</span>
+                        <span style="font-weight: 700; font-size: 1rem; color: #333; display: block;">🏷️ ${primary?.training_name || 'Treino'}</span>
                     </div>
-                `;
-            }
-
-            html += '</div>';
-            infoDiv.innerHTML = html;
+                    <div style="font-size: 0.95rem;">
+                        <span style="color: #666;">Treinos carregados:</span>
+                        <span style="font-weight: 700; font-size: 1rem; color: #333; display: block;">${numTrainings}</span>
+                    </div>
+                    <div style="font-size: 0.95rem;">
+                        <span style="color: #666;">Média de epochs:</span>
+                        <span style="font-weight: 700; font-size: 1rem; color: #333; display: block;">${avgEpochs}</span>
+                    </div>
+                </div>
+            `;
         },
 
         // Helper: Criar título com tooltip
@@ -425,30 +426,9 @@
             });
         },
 
-        // Renderiza um mini gráfico de inset (últimos N epochs) no modo publicação
-        renderInset(ctx, chartKey, labels, datasets) {
-            const container = ctx.canvas.parentElement;
-            if (!container) return;
-            container.style.position = 'relative';
-            const insetId = `inset-${chartKey}`;
-            const existing = container.querySelector(`#${insetId}`);
-            if (existing) existing.remove();
-            const insetCanvas = document.createElement('canvas');
-            insetCanvas.id = insetId;
-            insetCanvas.style.cssText = 'position:absolute; right:12px; bottom:12px; width:280px; height:180px; background: rgba(255,255,255,0.92); border: 1px solid #eee; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);';
-            container.appendChild(insetCanvas);
-            const insetCtx = insetCanvas.getContext('2d');
-            if (!insetCtx) return;
-            new Chart(insetCtx, {
-                type: 'line',
-                data: { labels, datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
-                    scales: { x: { grid: { display: false } }, y: { grid: { display: false } } }
-                }
-            });
+        // Insets removidos para evitar sobreposição
+        renderInset() {
+            // Funcionalidade desabilitada
         },
 
         // ===== GRÁFICOS =====
@@ -457,109 +437,59 @@
             const ctx = document.getElementById('chart-loss')?.getContext('2d');
             if (!ctx) return;
 
-            this.insertChartHeader(ctx, '📉 Loss: Treino × Validação', this.interpretations.loss);
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+            if (!run) return;
 
-            const datasets = this.mode === 'publication'
-                ? this.getPublicationDatasets_Loss()
-                : this.getExplorationDatasets_Loss();
+            const labels = Array.isArray(run.epochs) && run.epochs.length ? run.epochs : this.getUnifiedLabels();
+            const targetLen = this.getMaxEpochs();
+            const datasets = [
+                {
+                    label: 'Train Loss',
+                    data: this.padSeries(run.train_loss, targetLen),
+                    borderColor: '#3b82f6',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    fill: true
+                },
+                {
+                    label: 'Val Loss',
+                    data: this.padSeries(run.val_loss, targetLen),
+                    borderColor: '#f59e0b',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    fill: true,
+                    borderDash: [5, 5]
+                }
+            ];
+
+            const options = this.getChartOptions('Loss', this.mode);
+            options.plugins.pointValue = {
+                enabled: true,
+                formatter: (v) => typeof v === 'number' ? v.toFixed(2) : ''
+            };
 
             this.charts['loss'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: this.currentData[0].epochs,
-                    datasets: datasets
+                    labels,
+                    datasets
                 },
-                options: this.getChartOptions('Loss', this.mode)
+                options
             });
-
-            // Inset (últimos 30 epochs) em modo publicação
-            if (this.mode === 'publication') {
-                const lastN = 30;
-                const labels = this.currentData[0].epochs.slice(-lastN);
-                const pubSets = this.getPublicationDatasets_Loss();
-                const insetSets = pubSets.map(ds => ({
-                    ...ds,
-                    data: Array.isArray(ds.data) ? ds.data.slice(-lastN) : ds.data
-                }));
-                this.renderInset(ctx, 'chart-loss', labels, insetSets);
-            }
-        },
-
-        getPublicationDatasets_Loss() {
-            // Modo publicação: apenas média + intervalo, sem ruído
-            const trainLosses = this.currentData.map(d => d.train_loss);
-            const valLosses = this.currentData.map(d => d.val_loss);
-
-            const trainStats = this.calculateStats(trainLosses);
-            const valStats = this.calculateStats(valLosses);
-
-            return [
-                // Intervalo: linha inferior (m-σ) + superior (m+σ) com preenchimento entre elas
-                {
-                    label: 'Train Loss (−1σ)',
-                    data: trainStats.mean.map((m, i) => m - trainStats.std[i]),
-                    borderColor: 'transparent',
-                    backgroundColor: 'transparent',
-                    borderWidth: 0,
-                    pointRadius: 0,
-                    tension: 0
-                },
-                {
-                    label: 'Train Loss (+1σ)',
-                    data: trainStats.mean.map((m, i) => m + trainStats.std[i]),
-                    borderColor: 'transparent',
-                    backgroundColor: '#3b82f620',
-                    borderWidth: 0,
-                    fill: '-1',
-                    pointRadius: 0,
-                    tension: 0
-                },
-                {
-                    label: 'Train Loss (Média)',
-                    data: trainStats.mean,
-                    borderColor: '#3b82f6',
-                    borderWidth: 3,
-                    backgroundColor: 'transparent',
-                    tension: 0.4,
-                    pointRadius: 0,
-                    borderDash: []
-                },
-                {
-                    label: 'Val Loss (−1σ)',
-                    data: valStats.mean.map((m, i) => m - valStats.std[i]),
-                    borderColor: 'transparent',
-                    backgroundColor: 'transparent',
-                    borderWidth: 0,
-                    pointRadius: 0,
-                    tension: 0
-                },
-                {
-                    label: 'Val Loss (+1σ)',
-                    data: valStats.mean.map((m, i) => m + valStats.std[i]),
-                    borderColor: 'transparent',
-                    backgroundColor: '#ef444420',
-                    borderWidth: 0,
-                    fill: '-1',
-                    pointRadius: 0,
-                    tension: 0
-                },
-                {
-                    label: 'Val Loss (Média)',
-                    data: valStats.mean,
-                    borderColor: '#ef4444',
-                    borderWidth: 3,
-                    backgroundColor: 'transparent',
-                    tension: 0.4,
-                    pointRadius: 0,
-                    borderDash: [5, 5]
-                }
-            ];
         },
 
         getExplorationDatasets_Loss() {
             // Modo exploração: todas as curvas, cores diferentes
             const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
             const datasets = [];
+            const targetLen = this.getMaxEpochs();
 
             this.currentData.forEach((data, idx) => {
                 const color = colors[idx % colors.length];
@@ -569,7 +499,7 @@
 
                 datasets.push({
                     label: `${data.training_name} - Train`,
-                    data: data.train_loss,
+                    data: this.padSeries(data.train_loss, targetLen),
                     borderColor: color,
                     borderWidth: width,
                     backgroundColor: 'transparent',
@@ -582,7 +512,7 @@
 
                 datasets.push({
                     label: `${data.training_name} - Val`,
-                    data: data.val_loss,
+                    data: this.padSeries(data.val_loss, targetLen),
                     borderColor: color,
                     borderWidth: width,
                     backgroundColor: 'transparent',
@@ -598,30 +528,86 @@
             return datasets;
         },
 
+        // Simples: duas linhas (azul: train_loss, laranja: val_loss) do treino selecionado
+        getSimpleDatasets_Loss(runIdx) {
+            const data = this.currentData?.[runIdx];
+            if (!data) return [];
+            const targetLen = this.getMaxEpochs();
+            const train = this.padSeries(data.train_loss, targetLen);
+            const val = this.padSeries(data.val_loss, targetLen);
+            return [
+                {
+                    label: 'Train Loss',
+                    data: train,
+                    borderColor: '#3b82f6',
+                    borderWidth: 2.5,
+                    backgroundColor: 'transparent',
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 4
+                },
+                {
+                    label: 'Val Loss',
+                    data: val,
+                    borderColor: '#f59e0b',
+                    borderWidth: 2.5,
+                    backgroundColor: 'transparent',
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    borderDash: [5, 5]
+                }
+            ];
+        },
+
         renderGapChart() {
             const ctx = document.getElementById('chart-gap')?.getContext('2d');
             if (!ctx) return;
 
-            this.insertChartHeader(ctx, '📊 Gap de Generalização (Val − Train)', this.interpretations.gap);
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+            if (!run) return;
 
-            const datasets = this.mode === 'publication'
-                ? this.getPublicationDatasets_Gap()
-                : this.getExplorationDatasets_Gap();
+            const labels = Array.isArray(run.epochs) && run.epochs.length ? run.epochs : this.getUnifiedLabels();
+            const targetLen = this.getMaxEpochs();
+            const gap = this.safeSubtractArrays(run.val_loss, run.train_loss);
+            const datasets = [
+                {
+                    label: 'Gap (val_loss − train_loss)',
+                    data: this.padSeries(gap, targetLen),
+                    borderColor: '#f59e0b',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    fill: true
+                }
+            ];
 
             this.charts['gap'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: this.currentData[0].epochs,
+                    labels: labels,
                     datasets: datasets
                 },
-                options: this.getChartOptions('Gap', this.mode)
+                options: (() => {
+                    const options = this.getChartOptions('Gap', 'exploration');
+                    options.plugins.pointValue = {
+                        enabled: true,
+                        formatter: (v) => typeof v === 'number' ? v.toFixed(3) : ''
+                    };
+                    return options;
+                })()
             });
         },
 
         getPublicationDatasets_Gap() {
-            const gaps = this.currentData.map(d =>
-                d.val_loss.map((v, i) => v - d.train_loss[i])
-            );
+            const targetLen = this.getMaxEpochs();
+            const gaps = this.currentData.map(d => {
+                const raw = this.safeSubtractArrays(d.train_loss, d.val_loss);
+                return this.padSeries(raw, targetLen);
+            });
             const stats = this.calculateStats(gaps);
 
             return [
@@ -657,9 +643,11 @@
         getExplorationDatasets_Gap() {
             const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
             const datasets = [];
+            const targetLen = this.getMaxEpochs();
 
             this.currentData.forEach((data, idx) => {
-                const gap = data.val_loss.map((v, i) => v - data.train_loss[i]);
+                const gapRaw = this.safeSubtractArrays(data.train_loss, data.val_loss);
+                const gap = this.padSeries(gapRaw, targetLen);
                 const color = colors[idx % colors.length];
                 const isSelected = this.selectedRuns.has(idx);
 
@@ -683,35 +671,46 @@
             const ctx = document.getElementById('chart-acc-top1')?.getContext('2d');
             if (!ctx) return;
 
-            this.insertChartHeader(ctx, '🎯 Accuracy Top-1', this.interpretations.acc_top1);
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+            if (!run) return;
 
-            const datasets = this.mode === 'publication'
-                ? this.getPublicationDatasets_AccTop1()
-                : this.getExplorationDatasets_AccTop1();
+            const labels = Array.isArray(run.epochs) && run.epochs.length ? run.epochs : this.getUnifiedLabels();
+            const targetLen = this.getMaxEpochs();
+            const datasets = [
+                {
+                    label: 'Accuracy Top-1',
+                    data: this.padSeries(run.acc_top1, targetLen),
+                    borderColor: '#3b82f6',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(59, 130, 246, 0.16)',
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    fill: true
+                }
+            ];
 
             this.charts['acc_top1'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: this.currentData[0].epochs,
+                    labels: labels,
                     datasets: datasets
                 },
-                options: this.getChartOptions('Accuracy Top-1', this.mode, { min: 0, max: 1 })
+                options: (() => {
+                    const options = this.getChartOptions('Accuracy Top-1', 'exploration', { min: 0, max: 1 });
+                    options.plugins.pointValue = {
+                        enabled: true,
+                        formatter: (v) => typeof v === 'number' ? v.toFixed(3) : ''
+                    };
+                    return options;
+                })()
             });
-
-            if (this.mode === 'publication') {
-                const lastN = 30;
-                const labels = this.currentData[0].epochs.slice(-lastN);
-                const pubSets = this.getPublicationDatasets_AccTop1();
-                const insetSets = pubSets.map(ds => ({
-                    ...ds,
-                    data: Array.isArray(ds.data) ? ds.data.slice(-lastN) : ds.data
-                }));
-                this.renderInset(ctx, 'chart-acc-top1', labels, insetSets);
-            }
         },
 
         getPublicationDatasets_AccTop1() {
-            const accs = this.currentData.map(d => d.acc_top1);
+            const targetLen = this.getMaxEpochs();
+            const accs = this.currentData.map(d => this.padSeries(d.acc_top1, targetLen));
             const stats = this.calculateStats(accs);
 
             return [
@@ -747,6 +746,7 @@
         getExplorationDatasets_AccTop1() {
             const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
             const datasets = [];
+            const targetLen = this.getMaxEpochs();
 
             this.currentData.forEach((data, idx) => {
                 const color = colors[idx % colors.length];
@@ -754,7 +754,7 @@
 
                 datasets.push({
                     label: data.training_name,
-                    data: data.acc_top1,
+                    data: this.padSeries(data.acc_top1, targetLen),
                     borderColor: color,
                     borderWidth: isSelected ? 2.5 : 1.5,
                     backgroundColor: 'transparent',
@@ -773,15 +773,25 @@
             if (!ctx) return;
 
             this.insertChartHeader(ctx, '🎯 Accuracy Top-5', this.interpretations.acc_top5);
-
-            const datasets = this.mode === 'publication'
-                ? this.getPublicationDatasets_AccTop5()
-                : this.getExplorationDatasets_AccTop5();
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+            if (!run) return;
+            const labels = Array.isArray(run.epochs) && run.epochs.length ? run.epochs : this.getUnifiedLabels();
+            const datasets = [{
+                label: 'Accuracy Top-5',
+                data: this.padSeries(run.acc_top5, this.getMaxEpochs()),
+                borderColor: '#10b981',
+                borderWidth: 2.5,
+                backgroundColor: 'transparent',
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            }];
 
             this.charts['acc_top5'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: this.currentData[0].epochs,
+                    labels: labels,
                     datasets: datasets
                 },
                 options: this.getChartOptions('Accuracy Top-5', this.mode, { min: 0, max: 1 })
@@ -789,7 +799,8 @@
         },
 
         getPublicationDatasets_AccTop5() {
-            const accs = this.currentData.map(d => d.acc_top5);
+            const targetLen = this.getMaxEpochs();
+            const accs = this.currentData.map(d => this.padSeries(d.acc_top5, targetLen));
             const stats = this.calculateStats(accs);
 
             return [
@@ -825,6 +836,7 @@
         getExplorationDatasets_AccTop5() {
             const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
             const datasets = [];
+            const targetLen = this.getMaxEpochs();
 
             this.currentData.forEach((data, idx) => {
                 const color = colors[idx % colors.length];
@@ -832,7 +844,7 @@
 
                 datasets.push({
                     label: data.training_name,
-                    data: data.acc_top5,
+                    data: this.padSeries(data.acc_top5, targetLen),
                     borderColor: color,
                     borderWidth: isSelected ? 2.5 : 1.5,
                     backgroundColor: 'transparent',
@@ -851,25 +863,47 @@
             if (!ctx) return;
 
             this.insertChartHeader(ctx, '📈 Diferença Top-5 − Top-1', this.interpretations.delta_acc);
-
-            const datasets = this.mode === 'publication'
-                ? this.getPublicationDatasets_DeltaAcc()
-                : this.getExplorationDatasets_DeltaAcc();
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+            if (!run) return;
+            const labels = Array.isArray(run.epochs) && run.epochs.length ? run.epochs : this.getUnifiedLabels();
+            const raw = this.safeSubtractArrays(run.acc_top1, run.acc_top5);
+            const delta = this.padSeries(raw.map(v => typeof v === 'number' ? -v : v), this.getMaxEpochs());
+            const datasets = [{
+                label: 'Δ Top-5 − Top-1',
+                data: delta,
+                borderColor: '#8b5cf6',
+                borderWidth: 2,
+                backgroundColor: 'rgba(139, 92, 246, 0.16)',
+                tension: 0.35,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                fill: true
+            }];
 
             this.charts['delta_acc'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: this.currentData[0].epochs,
+                    labels: labels,
                     datasets: datasets
                 },
-                options: this.getChartOptions('Diferença (Top-5 − Top-1)', this.mode)
+                options: (() => {
+                    const options = this.getChartOptions('Diferença (Top-5 − Top-1)', this.mode);
+                    options.plugins.pointValue = {
+                        enabled: true,
+                        formatter: (v) => typeof v === 'number' ? v.toFixed(3) : ''
+                    };
+                    return options;
+                })()
             });
         },
 
         getPublicationDatasets_DeltaAcc() {
-            const deltas = this.currentData.map(d =>
-                d.acc_top5.map((v, i) => v - d.acc_top1[i])
-            );
+            const targetLen = this.getMaxEpochs();
+            const deltas = this.currentData.map(d => {
+                const raw = this.safeSubtractArrays(d.acc_top1, d.acc_top5);
+                return this.padSeries(raw.map(v => typeof v === 'number' ? -v : v), targetLen);
+            });
             const stats = this.calculateStats(deltas);
 
             return [
@@ -905,9 +939,11 @@
         getExplorationDatasets_DeltaAcc() {
             const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
             const datasets = [];
+            const targetLen = this.getMaxEpochs();
 
             this.currentData.forEach((data, idx) => {
-                const delta = data.acc_top5.map((v, i) => v - data.acc_top1[i]);
+                const raw = this.safeSubtractArrays(data.acc_top1, data.acc_top5);
+                const delta = this.padSeries(raw.map(v => typeof v === 'number' ? -v : v), targetLen);
                 const color = colors[idx % colors.length];
                 const isSelected = this.selectedRuns.has(idx);
 
@@ -927,30 +963,88 @@
             return datasets;
         },
 
-        renderStabilityChart() {
+        renderStabilityChart(customWindowSize = null) {
             const ctx = document.getElementById('chart-stability')?.getContext('2d');
             if (!ctx) return;
 
-            this.insertChartHeader(ctx, '📊 Estabilidade (Variância)', this.interpretations.stability);
+            const windowSizeInput = document.getElementById('window-size-input');
+            const windowSize = customWindowSize || (windowSizeInput ? parseInt(windowSizeInput.value) : 5);
 
-            const windowSize = 10;
-            const datasets = this.mode === 'publication'
-                ? this.getPublicationDatasets_Stability(windowSize)
-                : this.getExplorationDatasets_Stability(windowSize);
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+
+            if (!run || !run.val_loss || run.val_loss.length === 0) return;
+
+            const labels = Array.isArray(run.epochs) && run.epochs.length ? run.epochs : this.getUnifiedLabels();
+
+            // Calcula variância para Loss e Accuracy Top-1
+            const varianceLoss = this.calculateRollingVariance(run.val_loss, windowSize);
+            const varianceAcc = run.acc_top1 ? this.calculateRollingVariance(run.acc_top1, windowSize) : [];
+
+            // Ajusta labels para o tamanho da variância (começa a partir do índice windowSize-1)
+            const varianceLabels = labels.slice(windowSize - 1);
+
+            const datasets = [
+                {
+                    label: 'Variância: Erro (val/Loss)',
+                    data: varianceLoss,
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                    tension: 0.35,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    pointStyle: 'dash',
+                    fill: true
+                },
+                {
+                    label: 'Variância: Acerto (Top-1)',
+                    data: varianceAcc,
+                    borderColor: '#22c55e',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+                    tension: 0.35,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    pointStyle: 'dash',
+                    fill: true
+                }
+            ];
+
+            // Destroy anterior se existir
+            if (this.charts['stability']) {
+                this.charts['stability'].destroy();
+            }
 
             this.charts['stability'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: this.currentData[0].epochs.slice(windowSize - 1),
+                    labels: varianceLabels,
                     datasets: datasets
                 },
-                options: this.getChartOptions('Variância', this.mode)
+                options: (() => {
+                    const options = this.getChartOptions('Estabilidade', 'exploration');
+                    options.plugins.pointValue = {
+                        enabled: true,
+                        formatter: (v) => typeof v === 'number' ? v.toFixed(4) : ''
+                    };
+                    return options;
+                })()
             });
+
+            // Adiciona listener apenas uma vez
+            if (windowSizeInput && !windowSizeInput.dataset.listenerAttached) {
+                windowSizeInput.addEventListener('change', () => {
+                    this.renderStabilityChart();
+                });
+                windowSizeInput.dataset.listenerAttached = 'true';
+            }
         },
 
         getPublicationDatasets_Stability(windowSize) {
+            const targetLen = this.getMaxEpochs();
             const variances = this.currentData.map(d =>
-                this.calculateRollingVariance(d.val_loss, windowSize)
+                this.calculateRollingVariance(this.padSeries(d.val_loss, targetLen), windowSize)
             );
             const stats = this.calculateStats(variances);
 
@@ -987,9 +1081,10 @@
         getExplorationDatasets_Stability(windowSize) {
             const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
             const datasets = [];
+            const targetLen = this.getMaxEpochs();
 
             this.currentData.forEach((data, idx) => {
-                const variance = this.calculateRollingVariance(data.val_loss, windowSize);
+                const variance = this.calculateRollingVariance(this.padSeries(data.val_loss, targetLen), windowSize);
                 const color = colors[idx % colors.length];
                 const isSelected = this.selectedRuns.has(idx);
 
@@ -1013,6 +1108,11 @@
             const result = [];
             for (let i = windowSize - 1; i < data.length; i++) {
                 const window = data.slice(i - windowSize + 1, i + 1);
+                // Se houver null/NaN na janela, retorna null para manter integridade
+                if (window.some(v => typeof v !== 'number' || Number.isNaN(v))) {
+                    result.push(null);
+                    continue;
+                }
                 const mean = window.reduce((a, b) => a + b, 0) / windowSize;
                 const variance = window.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / windowSize;
                 result.push(variance);
@@ -1024,26 +1124,93 @@
             const ctx = document.getElementById('chart-lr')?.getContext('2d');
             if (!ctx) return;
 
-            this.insertChartHeader(ctx, '📉 Learning Rate Schedule', this.interpretations.lr);
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+            if (!run) return;
 
-            const datasets = this.currentData.length === 1
-                ? this.getExplorationDatasets_LR() // Single sempre exploração
-                : (this.mode === 'publication'
-                    ? this.getPublicationDatasets_LR()
-                    : this.getExplorationDatasets_LR());
+            const datasets = [
+                {
+                    label: 'lr/pg0(Bias)',
+                    data: this.padSeries(run.lr_pg0, this.getMaxEpochs()),
+                    borderColor: '#3b82f6',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(59, 130, 246, 0.14)',
+                    tension: 0.35,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    pointStyle: 'line',
+                    fill: true
+                },
+                {
+                    label: 'lr/pg1(Weights)',
+                    data: this.padSeries(run.lr_pg1, this.getMaxEpochs()),
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(239, 68, 68, 0.14)',
+                    tension: 0.35,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    pointStyle: 'line',
+                    fill: true
+                },
+                {
+                    label: 'lr/pg2(Normalização)',
+                    data: this.padSeries(run.lr_pg2, this.getMaxEpochs()),
+                    borderColor: '#10b981',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(16, 185, 129, 0.14)',
+                    tension: 0.35,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    pointStyle: 'line',
+                    fill: true
+                }
+            ];
+
+            const options = this.getChartOptions('Learning Rate', this.mode, {
+                type: 'logarithmic',
+                min: 0.00001
+            });
+
+            // Configurar legenda com pointStyle line
+            options.plugins.legend.labels.usePointStyle = true;
+            options.plugins.legend.labels.pointStyle = 'line';
+
+            // Customizar tooltip para mostrar 5 casas decimais
+            options.plugins.tooltip.callbacks = {
+                ...options.plugins.tooltip.callbacks,
+                label: function (context) {
+                    let label = context.dataset.label || '';
+                    if (label) {
+                        label += ': ';
+                    }
+                    if (context.parsed.y !== null) {
+                        label += context.parsed.y.toFixed(5);
+                    }
+                    return label;
+                }
+            };
 
             this.charts['lr'] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: this.currentData[0].epochs,
+                    labels: run.epochs || this.getUnifiedLabels(),
                     datasets: datasets
                 },
-                options: this.getChartOptions('Learning Rate', this.mode, { type: 'logarithmic' })
+                options: (() => {
+                    const options = this.getChartOptions('Loss', this.mode);
+                    options.plugins.pointValue = {
+                        enabled: true,
+                        formatter: (v) => typeof v === 'number' ? v.toFixed(5) : ''
+                    };
+                    return options;
+                })()
             });
         },
 
         getPublicationDatasets_LR() {
-            const lrArrays = this.currentData.map(d => d.lr_pg0);
+            const targetLen = this.getMaxEpochs();
+            const lrArrays = this.currentData.map(d => this.padSeries(d.lr_pg0, targetLen));
             const stats = this.calculateStats(lrArrays);
             return [
                 {
@@ -1085,17 +1252,18 @@
                 const data = this.currentData[0];
                 datasets.push({
                     label: 'lr/pg0',
-                    data: data.lr_pg0,
+                    data: this.padSeries(data.lr_pg0, this.getMaxEpochs()),
                     borderColor: colors[0],
                     borderWidth: 2.5,
                     backgroundColor: 'transparent',
                     tension: 0.3,
                     pointRadius: 1,
-                    pointHoverRadius: 5
+                    pointHoverRadius: 5,
+
                 });
                 datasets.push({
                     label: 'lr/pg1',
-                    data: data.lr_pg1,
+                    data: this.padSeries(data.lr_pg1, this.getMaxEpochs()),
                     borderColor: colors[1],
                     borderWidth: 2.5,
                     backgroundColor: 'transparent',
@@ -1105,7 +1273,7 @@
                 });
                 datasets.push({
                     label: 'lr/pg2',
-                    data: data.lr_pg2,
+                    data: this.padSeries(data.lr_pg2, this.getMaxEpochs()),
                     borderColor: colors[2],
                     borderWidth: 2.5,
                     backgroundColor: 'transparent',
@@ -1120,7 +1288,7 @@
 
                     datasets.push({
                         label: `${data.training_name} - lr/pg0`,
-                        data: data.lr_pg0,
+                        data: this.padSeries(data.lr_pg0, this.getMaxEpochs()),
                         borderColor: color,
                         borderWidth: isSelected ? 2.5 : 1.5,
                         backgroundColor: 'transparent',
@@ -1135,33 +1303,95 @@
             return datasets;
         },
 
+        renderMiniAreaChart() {
+            const ctx = document.getElementById('chart-mini-area')?.getContext('2d');
+            if (!ctx) return;
+
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+            if (!run || !Array.isArray(run.val_loss)) return;
+
+            const slice = Math.min(run.val_loss.length, 20);
+            const data = run.val_loss.slice(-slice);
+            const labels = Array.isArray(run.epochs) && run.epochs.length
+                ? run.epochs.slice(-slice)
+                : Array.from({ length: slice }, (_, i) => run.val_loss.length - slice + i + 1);
+
+            if (this.charts['mini_area']) this.charts['mini_area'].destroy();
+
+            this.charts['mini_area'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Val Loss',
+                        data,
+                        borderColor: '#f59e0b',
+                        borderWidth: 1.5,
+                        backgroundColor: 'rgba(245, 158, 11, 0.18)',
+                        tension: 0.4,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#ffffff',
+                            titleColor: '#0f172a',
+                            bodyColor: '#475569',
+                            borderColor: '#e2e8f0',
+                            borderWidth: 1,
+                            padding: 8,
+                            callbacks: {
+                                label: (ctx) => `Val Loss: ${typeof ctx.parsed.y === 'number' ? ctx.parsed.y.toFixed(3) : ''}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    },
+                    elements: {
+                        line: { borderCapStyle: 'round' },
+                        point: { radius: 0, hoverRadius: 0 }
+                    }
+                }
+            });
+        },
+
         renderTimeChart() {
             const ctx = document.getElementById('chart-time')?.getContext('2d');
             if (!ctx) return;
 
             this.insertChartHeader(ctx, '⏱️ Tempo por Epoch', this.interpretations.time);
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+            if (!run) return;
+            const datasets = [{
+                label: run.training_name || 'Tempo/Epoch',
+                data: run.time,
+                borderColor: '#3b82f6',
+                backgroundColor: '#3b82f680',
+                borderWidth: 1,
+                borderRadius: 3
+            }];
 
-            const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-            const datasets = [];
-
-            this.currentData.forEach((data, idx) => {
-                datasets.push({
-                    label: data.training_name,
-                    data: data.time,
-                    borderColor: colors[idx % colors.length],
-                    backgroundColor: colors[idx % colors.length] + '70',
-                    borderWidth: 1,
-                    borderRadius: 3
-                });
-            });
+            const options = this.getChartOptions('Tempo (s)', this.mode);
+            options.plugins.legend.labels.usePointStyle = true;
+            options.plugins.legend.labels.pointStyle = 'line';
 
             this.charts['time'] = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: this.currentData[0].epochs,
+                    labels: run.epochs || this.getUnifiedLabels(),
                     datasets: datasets
                 },
-                options: this.getChartOptions('Tempo (s)', this.mode)
+                options: options
             });
         },
 
@@ -1170,115 +1400,203 @@
             if (!ctx) return;
 
             this.insertChartHeader(ctx, '🔗 Correlação: Loss × Accuracy', this.interpretations.correlation);
+            const runIdx = this.getPrimaryRunIndex();
+            const run = this.currentData?.[runIdx];
+            if (!run) return;
+            const scatterData = run.val_loss.map((loss, i) => ({ x: loss, y: run.acc_top1[i] }));
 
-            const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-            const datasets = [];
-
-            this.currentData.forEach((data, idx) => {
-                const scatterData = data.val_loss.map((loss, i) => ({
-                    x: loss,
-                    y: data.acc_top1[i]
-                }));
-
-                datasets.push({
-                    label: data.training_name,
-                    data: scatterData,
-                    backgroundColor: colors[idx % colors.length] + '80',
-                    borderColor: colors[idx % colors.length],
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    borderWidth: 1
+            // Calcula regressão linear simples (y = a x + b) sobre os pontos válidos
+            const validPoints = scatterData.filter(p => typeof p.x === 'number' && typeof p.y === 'number');
+            let regressionLine = null;
+            if (validPoints.length >= 2) {
+                const n = validPoints.length;
+                let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+                validPoints.forEach(p => {
+                    sumX += p.x;
+                    sumY += p.y;
+                    sumXY += p.x * p.y;
+                    sumX2 += p.x * p.x;
                 });
-            });
+                const denominator = (n * sumX2 - sumX * sumX);
+                if (denominator !== 0) {
+                    const slope = (n * sumXY - sumX * sumY) / denominator;
+                    const intercept = (sumY - slope * sumX) / n;
+                    // desenha reta do xmin ao xmax dos dados
+                    const xs = validPoints.map(p => p.x);
+                    const minX = Math.min(...xs);
+                    const maxX = Math.max(...xs);
+                    regressionLine = [
+                        { x: minX, y: slope * minX + intercept },
+                        { x: maxX, y: slope * maxX + intercept }
+                    ];
+                }
+            }
+
+            const datasets = [{
+                label: run.training_name || 'Correlação',
+                data: scatterData,
+                backgroundColor: '#2563eb80',
+                borderColor: '#2563eb',
+                pointRadius: 4.5,
+                pointHoverRadius: 6.5,
+                pointStyle: 'circle',
+                borderWidth: 1.25,
+                showLine: false
+            }];
+
+            if (regressionLine) {
+                datasets.push({
+                    label: 'Tendência (regressão linear)',
+                    data: regressionLine,
+                    type: 'line',
+                    borderColor: '#1d4ed8',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    pointStyle: 'line',
+                    tension: 0,
+                    fill: false
+                });
+            }
+
+            const options = this.getChartOptions('Correlação', this.mode, { min: 0, max: 1 });
+            options.plugins.legend.labels.usePointStyle = true;
+            // mantém ponto circular para o scatter e traço para a regressão
+            options.plugins.legend.labels.pointStyle = 'circle';
 
             this.charts['correlation'] = new Chart(ctx, {
                 type: 'scatter',
                 data: { datasets: datasets },
-                options: this.getChartOptions('Correlação', this.mode, { min: 0, max: 1 })
+                options: options
             });
         },
 
         // ===== HELPERS =====
+        // Número máximo de epochs entre os treinos carregados
+        getMaxEpochs() {
+            if (!Array.isArray(this.currentData) || this.currentData.length === 0) return 0;
+            return this.currentData.reduce((max, d) => Math.max(max, (d.epochs?.length || 0)), 0);
+        },
 
+        // Labels unificados (usa o treino com mais epochs ou fallback 1..N)
+        getUnifiedLabels() {
+            const maxLen = this.getMaxEpochs();
+            if (maxLen === 0) return [];
+            const ref = this.currentData.reduce((best, d) => (d.epochs?.length || 0) > (best?.epochs?.length || 0) ? d : best, null);
+            if (ref && Array.isArray(ref.epochs) && ref.epochs.length === maxLen) return ref.epochs;
+            return Array.from({ length: maxLen }, (_, i) => i + 1);
+        },
+
+        // Pad de séries com null para alinhar tamanhos
+        padSeries(arr, targetLen) {
+            const out = Array.isArray(arr) ? arr.slice(0, targetLen) : [];
+            while (out.length < targetLen) out.push(null);
+            return out;
+        },
+
+        // Subtração segura elemento a elemento (val - train)
+        safeSubtractArrays(train, val) {
+            const len = Math.max(train?.length || 0, val?.length || 0);
+            const res = [];
+            for (let i = 0; i < len; i++) {
+                const tv = train?.[i];
+                const vv = val?.[i];
+                res.push((typeof tv === 'number' && typeof vv === 'number') ? (vv - tv) : null);
+            }
+            return res;
+        },
+
+        // Índice principal: primeiro selecionado, senão 0
+        getPrimaryRunIndex() {
+            if (this.selectedRuns && this.selectedRuns.size > 0) {
+                return Math.min(...Array.from(this.selectedRuns));
+            }
+            return 0;
+        },
+
+        // Estatísticas por índice ignorando null/NaN
         calculateStats(dataArrays) {
-            if (dataArrays.length === 0) return { mean: [], std: [] };
-
-            const len = dataArrays[0].length;
+            if (!Array.isArray(dataArrays) || dataArrays.length === 0) return { mean: [], std: [] };
+            const len = dataArrays.reduce((m, d) => Math.max(m, d?.length || 0), 0);
             const mean = [];
             const std = [];
-
             for (let i = 0; i < len; i++) {
-                const values = dataArrays.map(d => d[i]);
-                const m = values.reduce((a, b) => a + b, 0) / values.length;
-                const variance = values.reduce((sum, v) => sum + Math.pow(v - m, 2), 0) / values.length;
+                const vals = dataArrays.map(d => d?.[i]).filter(v => typeof v === 'number' && !Number.isNaN(v));
+                if (vals.length === 0) {
+                    mean.push(null);
+                    std.push(null);
+                    continue;
+                }
+                const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+                const variance = vals.reduce((sum, v) => sum + Math.pow(v - m, 2), 0) / vals.length;
                 mean.push(m);
                 std.push(Math.sqrt(variance));
             }
-
             return { mean, std };
         },
 
         getChartOptions(yAxisLabel, mode, yAxisConfig = {}) {
-            const showLegend = mode === 'exploration';
-
             return {
                 responsive: true,
-                maintainAspectRatio: true,
-                interaction: {
-                    mode: mode === 'exploration' ? 'index' : 'nearest',
-                    intersect: false
-                },
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        display: showLegend,
-                        position: 'bottom',
-                        maxHeight: 90,
+                        display: true,
+                        position: 'top',
+                        align: 'end',
                         labels: {
-                            font: { size: 11 },
-                            padding: 12,
+                            boxWidth: 8,
                             usePointStyle: true,
-                            pointStyle: 'circle'
+                            font: { size: 12, family: 'Inter' }
                         }
                     },
                     tooltip: {
-                        enabled: showLegend,
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        mode: 'index',
+                        intersect: false,
+                        backgroundColor: '#ffffff',
+                        titleColor: '#0f172a',
+                        bodyColor: '#64748b',
+                        borderColor: '#e2e8f0',
+                        borderWidth: 1,
                         padding: 12,
-                        titleFont: { size: 12, weight: 'bold' },
-                        bodyFont: { size: 11 },
-                        cornerRadius: 6
-                    },
-                    zoom: mode === 'exploration' ? {
-                        pan: { enabled: true },
-                        zoom: {
-                            wheel: { enabled: true },
-                            pinch: { enabled: true },
-                            mode: 'xy'
+                        displayColors: true,
+                        callbacks: {
+                            labelColor: function (context) {
+                                return {
+                                    borderColor: context.dataset.borderColor,
+                                    backgroundColor: context.dataset.borderColor,
+                                };
+                            }
                         }
-                    } : undefined
+                    },
+                    pointValue: {
+                        enabled: false
+                    }
                 },
                 scales: {
                     x: {
-                        title: {
-                            display: true,
-                            text: 'Epoch',
-                            font: { size: 12, weight: 'bold' }
-                        },
-                        grid: { display: true, color: '#f0f0f0' }
+                        grid: { display: false },
+                        ticks: { color: '#94a3b8', font: { size: 11 } }
                     },
                     y: {
-                        title: {
-                            display: true,
-                            text: yAxisLabel,
-                            font: { size: 12, weight: 'bold' }
-                        },
-                        grid: { display: true, color: '#f0f0f0' },
+                        grid: { color: '#f1f5f9' },
+                        ticks: { color: '#94a3b8', font: { size: 11 } },
+                        border: { display: false },
                         ...yAxisConfig
                     }
+                },
+                elements: {
+                    line: { tension: 0.4, borderWidth: 2 },
+                    point: { radius: 0, hoverRadius: 4, pointStyle: 'line' }
                 }
             };
         }
     };
+
+    // Registrar plugin de rótulos de ponto
+    if (window.Chart) {
+        window.Chart.register(TrainingAnalysis.pointValuePlugin);
+    }
 
     global.TrainingAnalysis = TrainingAnalysis;
 
