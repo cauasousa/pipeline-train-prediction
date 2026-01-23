@@ -21,9 +21,13 @@
         const view = document.getElementById('view');
         const tpl = PAGES[page];
 
-        // Cleanup: Se estava na página de treinamento, limpa TrainingControl
+        // Cleanup: Se estava na página de treinamento, limpa TrainingControl e gráficos
         if (global.TrainingControl && typeof global.TrainingControl.destroy === 'function') {
             global.TrainingControl.destroy();
+        }
+        // Destrói todos os gráficos Chart.js quando sai da página de treinamento
+        if (global.UI && typeof global.UI.destroyAllCharts === 'function') {
+            global.UI.destroyAllCharts();
         }
 
         if (!tpl) {
@@ -35,6 +39,10 @@
             view.innerHTML = cache[tpl];
             if (global.UI && typeof global.UI.bindPageHandlers === 'function') {
                 global.UI.bindPageHandlers(page);
+                // Reinicialize split controls after page is loaded
+                if (page === 'treinamento' && window.SplitControls?.reinit) {
+                    window.SplitControls.reinit();
+                }
             }
             return;
         }
@@ -45,6 +53,10 @@
             const html = await res.text();
             cache[tpl] = html;
             view.innerHTML = html;
+            // Reinicialize split controls after page is loaded
+            if (page === 'treinamento' && window.SplitControls?.reinit) {
+                window.SplitControls.reinit();
+            }
             if (global.UI && typeof global.UI.bindPageHandlers === 'function') {
                 global.UI.bindPageHandlers(page);
             }
@@ -77,7 +89,48 @@
     function toggleSidebar() {
         document.getElementById('sidebar')?.classList.toggle('collapsed');
         document.getElementById('main-content')?.classList.toggle('collapsed');
+
+        // Reinicia o timer de auto-ocultar quando o usuário interage
+        resetAutoHideTimer();
     }
+
+    // Timer para auto-ocultar sidebar
+    let autoHideTimer = null;
+
+    function resetAutoHideTimer() {
+        // Limpa o timer anterior se existir
+        if (autoHideTimer) {
+            clearTimeout(autoHideTimer);
+        }
+
+        // Só inicia o timer se a sidebar estiver visível (não collapsed)
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && !sidebar.classList.contains('collapsed')) {
+            autoHideTimer = setTimeout(() => {
+                sidebar.classList.add('collapsed');
+                document.getElementById('main-content')?.classList.add('collapsed');
+            }, 5000); // 5 segundos
+        }
+    }
+
+    // Inicia o timer quando a página carrega
+    window.addEventListener('DOMContentLoaded', () => {
+        resetAutoHideTimer();
+
+        // Reinicia o timer quando o mouse passa sobre a sidebar
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.addEventListener('mouseenter', () => {
+                if (autoHideTimer) {
+                    clearTimeout(autoHideTimer);
+                }
+            });
+
+            sidebar.addEventListener('mouseleave', () => {
+                resetAutoHideTimer();
+            });
+        }
+    });
 
     // Expõe no escopo global
     global.Navigation = {

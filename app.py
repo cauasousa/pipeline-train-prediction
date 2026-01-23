@@ -161,6 +161,8 @@ def serve_train_image(job_id, name):
     exts = ['.jpg', '.png', '.jpeg']
     search_dirs = []
 
+    print(f"[SERVE_IMG] Buscando: job_id={job_id}, name={name}")
+
     # Busca EXATA pelo nome do job primeiro (não usar _resolve_job_folder que busca prefixo)
     for root in get_candidate_roots():
         try:
@@ -172,9 +174,15 @@ def serve_train_image(job_id, name):
             if job_dir.exists() and job_dir.is_dir():
                 search_dirs.append(job_dir / 'predicao')
                 search_dirs.append(job_dir)
+                print(f"[SERVE_IMG] ✓ Job dir encontrado: {job_dir}")
                 break  # Encontrou, não precisa continuar
-        except Exception:
+        except Exception as e:
+            print(f"[SERVE_IMG] ✗ Erro ao verificar job: {e}")
             continue
+
+    if not search_dirs:
+        print(f"[SERVE_IMG] ✗ Nenhum diretório encontrado para job_id: {job_id}")
+        return jsonify({"error": "not_found", "job_id": job_id, "name": name}), 404
 
     # Busca arquivo nos diretórios encontrados
     for base in search_dirs:
@@ -182,10 +190,13 @@ def serve_train_image(job_id, name):
             for e in exts:
                 p = base / f"{name}{e}"
                 if p.exists() and p.is_file():
+                    print(f"[SERVE_IMG] ✓ Imagem encontrada: {p}")
                     return send_file(str(p))
-        except Exception:
+        except Exception as e:
+            print(f"[SERVE_IMG] ✗ Erro ao buscar em {base}: {e}")
             continue
 
+    print(f"[SERVE_IMG] ✗ Imagem não encontrada nos diretórios: {[str(d) for d in search_dirs]}")
     return jsonify({"error": "not_found", "job_id": job_id, "name": name}), 404
 
 
@@ -205,7 +216,8 @@ def list_train_images(job_id):
     resolved_root = None
     resolved_name = None
 
-    # print("=-=-=-=- Iniciando busca pelo job mais recente =-=-=-=-")
+    print(f"\n[API_IMAGES] ═══════════════════════════════════════════════")
+    print(f"[API_IMAGES] Buscando imagens para job_id: {job_id}")
 
     for root in get_candidate_roots():
         root_path = Path(root)
@@ -215,14 +227,20 @@ def list_train_images(job_id):
         # 1. Buscar todas as pastas que começam com o job_id
         # Ex: treinamento_classificacao, treinamento_classificacao2, treinamento_classificacao17
         candidate_folders = []
+        all_dirs = []
         for p in root_path.iterdir():
             if p.is_dir() and p.name.startswith(job_id):
+                all_dirs.append(p.name)
                 # Usamos regex para garantir que capturamos o sufixo numérico corretamente
                 # Isso evita pegar "treinamento_classificacao_backup" por engano
                 if p.name == job_id or re.match(rf"^{job_id}\d+$", p.name):
                     candidate_folders.append(p)
 
+        if all_dirs:
+            print(f"[API_IMAGES] Diretórios encontrados em {root_path.name}: {all_dirs}")
+        
         if not candidate_folders:
+            print(f"[API_IMAGES] ✗ Nenhuma pasta candidata encontrada em {root_path}")
             continue
 
         # 2. Encontrar a pasta com o maior sufixo numérico
@@ -236,23 +254,31 @@ def list_train_images(job_id):
 
         # Ordena pelas pastas com maior número no final
         latest_job_dir = max(candidate_folders, key=get_suffix_num)
+        suffix_num = get_suffix_num(latest_job_dir)
         
         resolved_root = root_path
         resolved_name = latest_job_dir.name  # Aqui será 'treinamento_classificacao17'
         search_dirs.append(latest_job_dir)
         search_dirs.append(latest_job_dir / 'predicao')
         
-        # print(f"Diretório mais recente encontrado: {latest_job_dir}")
+        print(f"[API_IMAGES] ✓ Candidatos: {[p.name for p in candidate_folders]}")
+        print(f"[API_IMAGES] ✓ Sufixo máximo: {suffix_num}")
+        print(f"[API_IMAGES] ✓ Pasta SELECIONADA: {resolved_name}")
+        print(f"[API_IMAGES] ✓ Caminho: {latest_job_dir}")
         break 
 
     if not search_dirs:
+        print(f"[API_IMAGES] ✗ search_dirs vazio - nenhuma pasta encontrada")
+        print(f"[API_IMAGES] ═══════════════════════════════════════════════\n")
         return jsonify({"images": [], "resolved_folder": None, "error": "job_not_found"})
 
     # O restante do seu loop de busca de imagens permanece quase igual, 
     # mas recomendo usar resolved_name na URL para garantir o path correto da imagem
+    img_count = 0
     for base in search_dirs:
         try:
             if not base or not base.exists():
+                print(f"[API_IMAGES] ✗ Base não existe: {base}")
                 continue
             for f in base.iterdir():
                 if(f.name == 'results.csv'):
@@ -271,11 +297,13 @@ def list_train_images(job_id):
                     # DICA: Use o resolved_name (o nome da pasta real) para a URL
                     url = f"{request.url_root.rstrip('/')}/train/image/{resolved_name}/{base_no_ext}?t={mtime}"
                     found.append({"name": f.name, "fullpath": full, "url": url, "mtime": mtime})
+                    img_count += 1
         except Exception as e:
-            print(f"Erro ao processar pasta {base}: {e}")
+            print(f"[API_IMAGES] ✗ Erro ao processar pasta {base}: {e}")
             continue
-    # print("=-=-=-=- Busca concluída =-=-=-=-")
-    # print(f"Imagens encontradas: {resolved_root} / {resolved_name} -> {found} imagens")
+    
+    print(f"[API_IMAGES] ✓ Total de imagens encontradas: {img_count}")
+    print(f"[API_IMAGES] ═════════════════════════════════════════════════\n")
     return jsonify({"images": found, "resolved_folder": resolved_name, "resolved_root": str(resolved_root)})
 
 

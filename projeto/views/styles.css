@@ -1,12 +1,71 @@
 /* Global */
 body {
-    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    font-family: Poppins, sans-serif;
     margin: 0;
     padding: 0;
     background: var(--bg);
     color: var(--text-primary);
     min-height: 100vh;
     overflow: auto;
+}
+
+/* Customização da Scrollbar - Glassmorphism High-Tech */
+/* Webkit (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, #551BB3, #00F5D4);
+    border-radius: 20px;
+    opacity: 0.5;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    opacity: 0.8;
+}
+
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #551BB3 transparent;
+}
+
+/* Canvas responsivo */
+canvas {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+}
+
+/* Split Control Cards - Componente Reutilizável Compacto */
+.split-control-card {
+    display: flex;
+    flex-direction: column;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 0.2s ease;
+    min-width: 0;
+}
+
+.split-control-card[data-class="negativa"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.split-control-card[data-class="positiva"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.split-control-card:hover {
+    box-shadow: 0 4px 12px rgba(85, 27, 179, 0.15);
 }
 
 /* Sidebar */
@@ -16,11 +75,11 @@ body {
     top: 0;
     height: 100%;
     width: var(--sidebar-width);
-    background: linear-gradient(180deg, var(--surface), #EDF2F7);
+    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
     border-right: 1px solid var(--border);
     padding: 18px;
     box-sizing: border-box;
-    z-index: 1000;
+    /* z-index: 70; */
     transition: width .2s ease;
     color: var(--text-primary);
 }
@@ -34,7 +93,7 @@ body {
     font-size: 20px;
     cursor: pointer;
     margin-bottom: 14px;
-    color: var(--muted);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 /* Menu items */
@@ -45,7 +104,7 @@ body {
     margin-bottom: 8px;
     border-radius: 8px;
     cursor: pointer;
-    color: var(--text-primary);
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .menu-item i {
@@ -55,9 +114,10 @@ body {
 
 .menu-item:hover,
 .menu-item.active {
-    background: rgba(74, 144, 226, 0.10);
-    box-shadow: 0 4px 12px var(--elevation);
-    border-left: 3px solid var(--color-primary);
+    background: rgba(0, 245, 212, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 245, 212, 0.2);
+    border-left: 3px solid var(--color-accent);
+    color: #ffffff;
 }
 
 .sidebar.collapsed .menu-item span {
@@ -68,14 +128,62 @@ body {
 .main-content {
     position: relative;
     margin-left: var(--sidebar-width);
-    min-height: 100vh;
+    min-height: auto;
+    max-width: calc(100vw - var(--sidebar-width));
     padding: 10px 20px;
     box-sizing: border-box;
-    overflow-y: auto;
+    /* overflow-y: auto; */
+    overflow-x: visible;
+    /* Mudado de hidden para visible - permite position: sticky */
     transition: margin-left .25s ease, margin-right .25s ease;
-    z-index: 1;
-    background: #f6f8fb;
+    background: var(--main-primary);
     color: var(--text-primary);
+}
+
+.main-content.collapsed {
+    margin-left: var(--sidebar-collapsed-width);
+    max-width: calc(100vw - var(--sidebar-collapsed-width));
+}
+
+/* View container */
+#view {
+    min-height: auto;
+    height: auto;
+    width: 100%;
+    overflow-x: visible;
+    /* Mudado de hidden para visible - permite position: sticky */
+}
+
+/* Training page section */
+#training-page {
+    min-height: auto;
+    height: auto;
+    width: 100%;
+    overflow-x: visible;
+    /* Mudado de hidden para visible para permitir position: sticky */
+}
+
+/* STICKY HEADER FIX */
+.training-page-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 999 !important;
+    background: var(--surface, var(--background, #fff)) !important;
+    padding: 12px 16px !important;
+    margin-bottom: 16px !important;
+    border-bottom: 2px solid var(--border, #e5e7eb) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    width: calc(100% - 32px) !important;
+    left: 0 !important;
+    right: 0 !important;
+    overflow: visible !important;
+}
+
+/* Section base */
+.section {
+    width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 /* Section Headers (Etapas) */
@@ -113,7 +221,20 @@ body {
     border: 1px solid var(--border);
     padding: 15px;
     border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 2px 8px rgba(85, 27, 179, 0.06);
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: visible;
+}
+
+/* Textarea e pre dentro de cards */
+.card textarea,
+.card pre {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
 }
 
 /* Summary Card (Resumo do Dataset) */
@@ -215,7 +336,309 @@ body {
     box-sizing: border-box;
 }
 
+/* Tooltip system (global) */
+.info-tooltip {
+    position: relative;
+    display: inline-flex;
+    color: var(--text-muted, #636E72);
+    cursor: help;
+    transition: color 0.2s;
+    z-index: 10000;
+}
 
+.info-tooltip:hover {
+    color: var(--color-primary, #4A90E2);
+}
+
+.info-tooltip svg {
+    width: 12px;
+    height: 12px;
+}
+
+.info-tooltip .tooltip-content {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--color-primary, #4A90E2);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    font-size: 12px;
+    padding: 12px 14px;
+    box-shadow: 0 10px 30px -5px rgba(74, 144, 226, 0.35), 0 2px 8px rgba(0, 0, 0, 0.1);
+    white-space: normal;
+    max-width: 320px;
+    min-width: 280px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    line-height: 1.5;
+}
+
+.info-tooltip:hover .tooltip-content {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.info-tooltip .tooltip-content::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: var(--color-primary, #4A90E2);
+}
+
+/* Tooltip internal sections */
+.tooltip-section {
+    margin-bottom: 10px;
+}
+
+.tooltip-section:last-child {
+    margin-bottom: 0;
+}
+
+.tooltip-section.alert {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-left: 3px solid #FFD93D;
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+
+.tooltip-title {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 5px;
+    color: #E3F2FF;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tooltip-section.alert .tooltip-title {
+    color: #FFD93D;
+}
+
+.tooltip-section p {
+    margin: 3px 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #ffffff;
+}
+
+.tooltip-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.25);
+    margin: 10px 0;
+}
+
+/* Split Control Components (Train/Val/Test Sliders) */
+.split-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+@media (max-width: 768px) {
+    .split-controls-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.split-control-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.split-control-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.split-slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.split-label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #636E72;
+    margin: 0;
+}
+
+.split-slider-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.split-slider {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 10px;
+    outline: none;
+    transition: background 0.3s;
+}
+
+.split-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #28a745;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(40, 167, 69, 0.3);
+    transition: all 0.2s;
+    margin-top: -5px;
+}
+
+.split-slider::-webkit-slider-thumb:hover {
+    background: #218838;
+    transform: scale(1.1);
+    box-shadow: 0 3px 8px rgba(40, 167, 69, 0.5);
+}
+
+.split-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #28a745;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 5px rgba(40, 167, 69, 0.3);
+    transition: all 0.2s;
+    margin-top: -5px;
+}
+
+.split-slider::-moz-range-thumb:hover {
+    background: #218838;
+    transform: scale(1.1);
+    box-shadow: 0 3px 8px rgba(40, 167, 69, 0.5);
+}
+
+/* Sliders negativos - vermelho */
+#rand-train-slider::-webkit-slider-thumb,
+#rand-val-slider::-webkit-slider-thumb,
+#rand-test-slider::-webkit-slider-thumb {
+    background: #FF6B6B;
+    box-shadow: 0 2px 5px rgba(255, 107, 107, 0.3);
+}
+
+#rand-train-slider::-webkit-slider-thumb:hover,
+#rand-val-slider::-webkit-slider-thumb:hover,
+#rand-test-slider::-webkit-slider-thumb:hover {
+    background: #e74c3c;
+    box-shadow: 0 3px 8px rgba(255, 107, 107, 0.5);
+}
+
+#rand-train-slider::-moz-range-thumb,
+#rand-val-slider::-moz-range-thumb,
+#rand-test-slider::-moz-range-thumb {
+    background: #FF6B6B;
+    box-shadow: 0 2px 5px rgba(255, 107, 107, 0.3);
+}
+
+#rand-train-slider::-moz-range-thumb:hover,
+#rand-val-slider::-moz-range-thumb:hover,
+#rand-test-slider::-moz-range-thumb:hover {
+    background: #e74c3c;
+    box-shadow: 0 3px 8px rgba(255, 107, 107, 0.5);
+}
+
+/* Track (trilha) dos sliders positivos - verde */
+#train-slider::-webkit-slider-runnable-track,
+#val-slider::-webkit-slider-runnable-track,
+#test-slider::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, #28a745 0%, #28a745 var(--value, 50%), var(--border) var(--value, 50%), var(--border) 100%);
+    height: 6px;
+    border-radius: 10px;
+}
+
+#train-slider::-moz-range-track,
+#val-slider::-moz-range-track,
+#test-slider::-moz-range-track {
+    background: var(--border);
+    height: 6px;
+    border-radius: 10px;
+}
+
+#train-slider::-moz-range-progress,
+#val-slider::-moz-range-progress,
+#test-slider::-moz-range-progress {
+    background: #28a745;
+    height: 6px;
+    border-radius: 10px;
+}
+
+/* Track (trilha) dos sliders negativos - vermelho */
+#rand-train-slider::-webkit-slider-runnable-track,
+#rand-val-slider::-webkit-slider-runnable-track,
+#rand-test-slider::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, #FF6B6B 0%, #FF6B6B var(--value, 50%), var(--border) var(--value, 50%), var(--border) 100%);
+    height: 6px;
+    border-radius: 10px;
+}
+
+#rand-train-slider::-moz-range-track,
+#rand-val-slider::-moz-range-track,
+#rand-test-slider::-moz-range-track {
+    background: var(--border);
+    height: 6px;
+    border-radius: 10px;
+}
+
+#rand-train-slider::-moz-range-progress,
+#rand-val-slider::-moz-range-progress,
+#rand-test-slider::-moz-range-progress {
+    background: #FF6B6B;
+    height: 6px;
+    border-radius: 10px;
+}
+
+.split-value {
+    min-width: 45px;
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.split-total {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border-radius: 6px;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.split-total.valid {
+    background: #e6f7ed;
+    border-color: #7ED6A6;
+    color: #0a6b3a;
+}
+
+.split-total.invalid {
+    background: #ffe6e6;
+    border-color: #FF6B6B;
+    color: #c92a2a;
+}
 
 
 /* Estilizacao para os itens de modelo que o ui.js cria dinamicamente */
@@ -346,12 +769,6 @@ textarea:focus {
     border-color: var(--color-primary);
     box-shadow: 0 6px 20px rgba(74, 144, 226, 0.12);
     transform: translateY(-1px);
-}
-
-/* Improve small inline labels + inputs alignment inside table cells */
-.table input[type="number"],
-.table .input-small {
-    min-width: 80px;
 }
 
 /* Slightly larger checkboxes/radio for touch friendliness */
@@ -1127,7 +1544,7 @@ textarea#logs {
     background: rgba(0, 0, 0, 0.88);
     z-index: 10000;
     display: none;
-    font-family: Inter, Arial, sans-serif;
+    font-family: Poppins, sans-serif;
     color: #eaeaea;
 }
 
@@ -1451,5 +1868,100 @@ textarea#logs {
 
     .preprocess-modal-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════ */
+/* JSON Editor - Dark Mode & Syntax Highlighting */
+/* ═══════════════════════════════════════════════════════════ */
+
+.config-preview {
+    /* Syntax highlighting para JSON em modo preview */
+    white-space: pre-wrap !important;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+
+/* Cores para diferentes elementos JSON */
+.json-key {
+    color: #60A5FA;
+    /* Azul claro para chaves */
+    font-weight: 600;
+}
+
+.json-string {
+    color: #34D399;
+    /* Verde para strings */
+}
+
+.json-number {
+    color: #FBBF24;
+    /* Âmbar para números */
+}
+
+.json-boolean {
+    color: #F87171;
+    /* Vermelho para booleanos */
+}
+
+.json-null {
+    color: #A78BFA;
+    /* Roxo para null */
+}
+
+.json-bracket {
+    color: #CBD5E1;
+    /* Cinza-claro para chaves/colchetes */
+}
+
+/* Cursor de edição customizado */
+#config-json {
+    caret-color: #60A5FA;
+}
+
+#config-json::selection {
+    background: rgba(96, 165, 250, 0.25);
+}
+
+/* Focus state melhorado */
+#config-json:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.3);
+}
+
+/* Scroll da textarea customizado */
+#config-json::-webkit-scrollbar {
+    width: 8px;
+}
+
+#config-json::-webkit-scrollbar-track {
+    background: #0F172A;
+}
+
+#config-json::-webkit-scrollbar-thumb {
+    background: rgba(96, 165, 250, 0.3);
+    border-radius: 4px;
+}
+
+#config-json::-webkit-scrollbar-thumb:hover {
+    background: rgba(96, 165, 250, 0.5);
+}
+
+/* Animação suave para transições */
+#config-editor-container {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#config-preview-container {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
     }
 }

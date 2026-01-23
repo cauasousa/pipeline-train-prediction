@@ -2,18 +2,18 @@
     :root {
         --background: #ffffff;
         --foreground: #0f172a;
-        --card: #ffffff;
+        --card: #F8FAFC;
         --card-foreground: #0f172a;
-        --primary: #2563eb;
+        --primary: #551BB3;
         --muted: #64748b;
         --muted-foreground: #94a3b8;
-        --border: #e2e8f0;
-        --ring: #3b82f6;
+        --border: #E2E8F0;
+        --ring: #7B42D9;
     }
 
     #analysis-page {
-        font-family: 'Inter', system-ui, sans-serif;
-        background-color: #f8fafc;
+        font-family: 'Poppins', sans-serif;
+        background-color: var(--background);
         padding: 2rem;
         color: var(--foreground);
     }
@@ -26,8 +26,8 @@
     }
 
     .chart-card {
-        background: white;
-        border: 1px solid #e2e8f0;
+        background: var(--card);
+        border: 1px solid var(--border);
         border-radius: 12px;
         padding: 1.25rem;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -113,7 +113,7 @@
 
     .custom-select:focus {
         border-color: var(--primary);
-        ring: 2px var(--primary);
+        box-shadow: 0 0 0 2px var(--primary);
     }
 
     .btn-generate {
@@ -214,8 +214,8 @@
     }
 
     .info-tooltip svg {
-        width: 16px;
-        height: 16px;
+        width: 12px;
+        height: 12px;
     }
 
     .info-tooltip .tooltip-content {

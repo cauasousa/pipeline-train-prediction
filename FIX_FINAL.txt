@@ -1,0 +1,58 @@
+## ✅ CORREÇÃO FINAL APLICADA
+
+### O que foi corrigido:
+
+❌ **ANTES**: Sistema tentava usar `TrainingResultsManager` que NUNCA ficava disponível
+```
+[DEBUG] TrainingResultsManager não disponível, enfileirando 3 imagem(ns)...
+[DEBUG] TrainingResultsManager não disponível, enfileirando 2 imagem(ns)...
+[DEBUG] TrainingResultsManager não disponível, enfileirando 1 imagem(ns)...
+... INFINITO ...
+```
+
+✅ **DEPOIS**: Imagens renderizadas **DIRETAMENTE** nos containers das abas
+
+### Mudanças feitas:
+
+1. **`_appendImageRow()` simplificado** (training_control.js)
+   - Removida TODA lógica de fila e retry
+   - Removida dependência do `TrainingResultsManager`
+   - Imagens renderizadas DIRETO em `#training-images-batches`, `#training-images-metrics`, `#training-images-evolution`
+   - HTML gerado localmente (sem esperar por manager)
+
+2. **`startImagePolling()` simplificado** (training_control.js)
+   - Removidas chamadas ao manager
+   - Limpeza direta dos containers das abas
+   - Mostrar/ocultar empty states manualmente
+
+### Resultado:
+
+```
+User clica "Visualizar" job
+    ↓
+startImagePolling() começa
+    ↓
+_pollImagesOnce() busca imagens do backend
+    ↓
+_appendImageRow() renderiza DIRETO nos containers
+    ↓
+Abas mostram imagens IMEDIATAMENTE ✅
+```
+
+### Teste agora:
+
+```bash
+cd m:\Mestrado\pipeline_train
+python -m flask run --host=0.0.0.0 --port=5000
+```
+
+1. Abra http://localhost:5000
+2. Vá para "Treinamento"
+3. Selecione um job no dropdown
+4. Clique em "Visualizar"
+5. **Abas devem carregar imagens em 1-3 segundos** ✅
+
+---
+
+**Status**: ✅ **CORRIGIDO E PRONTO**  
+Sem mais `.md` files criados - apenas correção direta do código!

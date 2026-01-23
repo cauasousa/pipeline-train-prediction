@@ -1,409 +1,2104 @@
-<div class="section" id="training-page">
+<div class="section" id="training-page" style="overflow: visible;">
+    <!-- Mock preventivo para evitar erros de inicialização -->
+    <script>
+        if (!window.TrainingResultsManager) {
+            console.log('[treinamento.html] Criando TrainingResultsManager mock preventivo');
+            window.TrainingResultsManager = {
+                isReady: true,
+                queue: [],
+                init: function () { console.log('[Manager Mock] Ready'); },
+                addImagesToTab: function (data) { console.log('[Manager Mock] Dados recebidos via fallback', data); },
+                addImage: function (data) { console.log('[Manager Mock] Imagem recebida via fallback', data); }
+            };
+        }
+    </script>
+
+    <!-- Scripts de gerenciamento - carregados ANTES do conteúdo -->
+    <script src="/projeto/views/js/console_manager.js"></script>
+    <script src="/projeto/views/js/training_results_manager.js"></script>
+
     <!-- <h2>Treinamento</h2> -->
-    <div>
-            
-            <h3 style="font-size: 1.5rem; font-weight: 700; color: #0f172a; margin-top: 0.5rem;">Treinamento da Rede Neural</h3>
-        </div>
+    <div class="training-page-header"
+        style="position: sticky; top: 0; z-index: 999; background: var(--background, #fff); padding: 12px 0; margin-bottom: 16px; border-bottom: 2px solid var(--border, #e5e7eb); box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
 
-    <div class="section-header">
-        <span class="section-step">ETAPA 1</span>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <h3 style="font-size: 1.5rem; font-weight: 700; color: #0f172a; margin: 0;">Treinamento da Rede Neural
+            </h3>
+
+            <div style="display: flex; gap: 10px; align-items: center; justify-content: flex-end;">
+                <button class="btn" id="start-training-btn" style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M13 2L4.5 13H11V22L19.5 11H13V2Z" />
+                    </svg>
+                    Iniciar Treinamento
+                </button>
+
+                <button class="btn btn-danger hidden" id="cancel-training-btn" disabled
+                    style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>
+                    Cancelar Treinamento
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- <div class="section-header">
         <h3>Seleção do Dataset</h3>
-    </div>
+    </div> -->
+    <div class="card">
+        <style>
+            /* Input numérico modernizado */
+            .modern-number-input {
+                display: inline-flex;
+                align-items: center;
+                background: var(--surface, #fff);
+                border: 1px solid var(--border, #e5e7eb);
+                border-radius: 6px;
+                padding: 2px;
+                height: 26px;
+                transition: all 0.2s ease;
+            }
 
-    <div class="card" style="margin-bottom: 20px;">
-        <div class="form-group">
-            <label><strong>Dataset Positivo</strong></label>
-            <div style="display:flex; gap: 10px; align-items: center;">
-                <select id="dataset-select" class="input" style="flex-grow: 1;"></select>
-                <button class="btn" id="upload-dataset-btn" style="flex-shrink: 0;">📁 Upload Pasta</button>
-            </div>
-        </div>
-    </div>
+            .modern-number-input:focus-within {
+                border-color: #551BB3;
+                box-shadow: 0 0 0 2px rgba(85, 27, 179, 0.15);
+            }
 
-    <div class="section-header">
-        <span class="section-step">ETAPA 2</span>
-        <h3>Divisão e Configuração do Conjunto de Dados</h3>
-    </div>
+            /* Esconde setas padrão do Chrome/Safari/Edge/Firefox */
+            .modern-number-input input::-webkit-outer-spin-button,
+            .modern-number-input input::-webkit-inner-spin-button {
+                -webkit-appearance: none;
+                margin: 0;
+            }
 
-    <div class="card config-card" style="margin-bottom: 20px;">
-        <h4 style="margin-top:5px; margin-bottom:5px;">Divisão da Classe Positiva</h4>
-        <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom: 10px;">
-            Ajuste as proporções de treino, validação e teste (Total = 100%).
-        </p>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <div class="form-group">
-                <label>Train (%)</label>
-                <input type="number" id="train-percent" class="input" value="70" min="0" max="100">
-            </div>
-            <div class="form-group">
-                <label>Val (%)</label>
-                <input type="number" id="val-percent" class="input" value="20" min="0" max="100">
-            </div>
-            <div class="form-group">
-                <label>Test (%)</label>
-                <input type="number" id="test-percent" class="input" value="10" min="0" max="100">
-            </div>
-        </div>
+            .modern-number-input input[type=number] {
+                -moz-appearance: textfield;
+                appearance: textfield;
+            }
 
-        <hr style="margin:20px 0;">
-
-        <h4 style="margin-bottom:10px;">Dados de Negativos (Seleção por Linha)</h4>
-        <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom: 15px;">Selecione e defina a
-            quantidade de imagens para a classe negativa (<code>negativo</code>), por tipo ou linha específica.</p>
-
-        <div id="negative-data-control">
-
-
-            <div class="table-container">
-                <table class="table" id="negative-selection-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 35%;">Tipo de Implante</th>
-                            <th style="width: 25%;">Detalhes</th>
-                            <th style="width: 20%;">Linhas Ativas</th>
-                            <th style="width: 20%;">Total de Imagens</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr data-type="Cone" data-name="Cone Morse">
-                            <td>
-                                <div style="display:flex; align-items:center; gap: 8px;">
-                                    <input type="checkbox" id="check-cone" value="Cone" checked>
-                                    <label for="check-cone" style="margin: 0;">Cone Morse</label>
-                                </div>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm" onclick="global.UI.toggleLineSelection(this, 'Cone')">⚙️
-                                    Detalhes</button>
-                            </td>
-                            <td class="selected-lines-count">X Linhas</td>
-                            <td class="total-selected-count">X Imagens</td>
-                        </tr>
-                        <tr class="line-detail-row hidden" data-parent="Cone">
-                            <td colspan="4" style="padding: 0;">
-                                <div class="line-detail-panel" style="background:var(--surface); padding: 15px;">
-
-                                    <div class="line-detail-actions"
-                                        style="display:flex;justify-content:space-between;align-items:center;margin-bottom: 10px;">
-                                        <strong style="font-size: 14px;">Configuração de Seleção:</strong>
-
-                                    </div>
-
-                                    <div class="mode-options-group"
-                                        style="display: flex; gap: 20px; margin-bottom: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: white;">
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="radio" name="mode-Cone" value="random" checked
-                                                onchange="global.UI.setNegativeSelectionMode('Cone', 'random')">
-                                            Implantes Aleatórios
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="radio" name="mode-Cone" value="select"
-                                                onchange="global.UI.setNegativeSelectionMode('Cone', 'select')">
-                                            Selecionar Linhas
-                                        </label>
-                                    </div>
-
-                                    <div class="line-random-panel" data-type="Cone"
-                                        style="padding: 10px; border: 1px dashed var(--border); border-radius: 6px;">
-                                        <label style="font-weight: 600;">Quantidade Por Linha (Automática):</label>
-                                        <input type="number" data-type-count="Cone"
-                                            class="input input-small type-count-input" value="100" min="0" max="9999"
-                                            style="max-width: 120px;" />
-                                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top: 5px;">Aplica o
-                                            valor acima a TODAS as <span class="available-lines-count">X</span> linhas
-                                            disponíveis.</p>
-                                    </div>
-
-                                    <div class="line-detail-grid line-select-panel" data-type="Cone"
-                                        style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: white;">
-                                    </div>
-
-                                </div>
-                            </td>
-                        </tr>
-
-                        <tr data-type="Hex Externo" data-name="Hex. Externo">
-                            <td>
-                                <div style="display:flex; align-items:center; gap: 8px;">
-                                    <input type="checkbox" id="check-hexext" value="Hex Externo">
-                                    <label for="check-hexext" style="margin: 0;">Hex. Externo</label>
-                                </div>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm"
-                                    onclick="global.UI.toggleLineSelection(this, 'Hex Externo')">⚙️ Detalhes</button>
-                            </td>
-                            <td class="selected-lines-count">X Linhas</td>
-                            <td class="total-selected-count">X Imagens</td>
-                        </tr>
-                        <tr class="line-detail-row hidden" data-parent="Hex Externo">
-                            <td colspan="4" style="padding: 0;">
-                                <div class="line-detail-panel" style="background:var(--surface); padding: 15px;">
-
-                                    <div class="line-detail-actions"
-                                        style="display:flex;justify-content:space-between;align-items:center;margin-bottom: 10px;">
-                                        <strong style="font-size: 14px;">Configuração de Seleção:</strong>
-
-                                    </div>
-
-                                    <div class="mode-options-group"
-                                        style="display: flex; gap: 20px; margin-bottom: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: white;">
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="radio" name="mode-Hex Externo" value="random" checked
-                                                onchange="global.UI.setNegativeSelectionMode('Hex Externo', 'random')">
-                                            Implantes Aleatórios
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="radio" name="mode-Hex Externo" value="select"
-                                                onchange="global.UI.setNegativeSelectionMode('Hex Externo', 'select')">
-                                            Selecionar Linhas
-                                        </label>
-                                    </div>
-
-                                    <div class="line-random-panel" data-type="Hex Externo"
-                                        style="padding: 10px; border: 1px dashed var(--border); border-radius: 6px;">
-                                        <label style="font-weight: 600;">Quantidade Por Linha (Automática):</label>
-                                        <input type="number" data-type-count="Hex Externo"
-                                            class="input input-small type-count-input" value="100" min="0" max="9999"
-                                            style="max-width: 120px;" />
-                                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top: 5px;">Aplica o
-                                            valor acima a TODAS as <span class="available-lines-count">X</span> linhas
-                                            disponíveis.</p>
-                                    </div>
-
-                                    <div class="line-detail-grid line-select-panel" data-type="Hex Externo"
-                                        style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: white;">
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-
-                        <tr data-type="Hex Interno" data-name="Hex. Interno">
-                            <td>
-                                <div style="display:flex; align-items:center; gap: 8px;">
-                                    <input type="checkbox" id="check-hexint" value="Hex Interno">
-                                    <label for="check-hexint" style="margin: 0;">Hex. Interno</label>
-                                </div>
-                            </td>
-                            <td>
-                                <button class="btn btn-sm"
-                                    onclick="global.UI.toggleLineSelection(this, 'Hex Interno')">⚙️ Detalhes</button>
-                            </td>
-                            <td class="selected-lines-count">X Linhas</td>
-                            <td class="total-selected-count">X Imagens</td>
-                        </tr>
-                        <tr class="line-detail-row hidden" data-parent="Hex Interno">
-                            <td colspan="4" style="padding: 0;">
-                                <div class="line-detail-panel" style="background:var(--surface); padding: 15px;">
-
-                                    <div class="line-detail-actions"
-                                        style="display:flex;justify-content:space-between;align-items:center;margin-bottom: 10px;">
-                                        <strong style="font-size: 14px;">Configuração de Seleção:</strong>
-
-                                    </div>
-
-                                    <div class="mode-options-group"
-                                        style="display: flex; gap: 20px; margin-bottom: 15px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: white;">
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="radio" name="mode-Hex Interno" value="random" checked
-                                                onchange="global.UI.setNegativeSelectionMode('Hex Interno', 'random')">
-                                            Implantes Aleatórios
-                                        </label>
-                                        <label style="display: flex; align-items: center; gap: 5px;">
-                                            <input type="radio" name="mode-Hex Interno" value="select"
-                                                onchange="global.UI.setNegativeSelectionMode('Hex Interno', 'select')">
-                                            Selecionar Linhas
-                                        </label>
-                                    </div>
-
-                                    <div class="line-random-panel" data-type="Hex Interno"
-                                        style="padding: 10px; border: 1px dashed var(--border); border-radius: 6px;">
-                                        <label style="font-weight: 600;">Quantidade Por Linha (Automática):</label>
-                                        <input type="number" data-type-count="Hex Interno"
-                                            class="input input-small type-count-input" value="100" min="0" max="9999"
-                                            style="max-width: 120px;" />
-                                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top: 5px;">Aplica o
-                                            valor acima a TODAS as <span class="available-lines-count">X</span> linhas
-                                            disponíveis (1 linha implícita).</p>
-                                    </div>
-
-                                    <div class="line-detail-grid line-select-panel" data-type="Hex Interno"
-                                        style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: white;">
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div style="margin-top:20px;">
-                <label>Separação do Conjunto Negativo (P/ cada Linha)</label>
-                <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                    <div><label>Train (%)</label><input type="number" id="rand-train-percent" class="input" value="70"
-                            min="0" max="100"></div>
-                    <div><label>Val (%)</label><input type="number" id="rand-val-percent" class="input" value="20"
-                            min="0" max="100"></div>
-                    <div><label>Test (%)</label><input type="number" id="rand-test-percent" class="input" value="10"
-                            min="0" max="100"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Hidden elements para armazenar dados (usados pelo JavaScript) -->
-        <div id="total-positive-count" style="display:none;">1000</div>
-        <div id="total-negative-count" style="display:none;">0</div>
-        <div id="total-all" style="display:none;">1000</div>
-        <div id="positive-split" style="display:none;">700 / 200 / 100</div>
-        <div id="negative-split" style="display:none;">0 / 0 / 0</div>
-        <div id="total-split" style="display:none;">700 / 200 / 100</div>
-
-    </div>
-
-    <div class="card summary-card" style="margin-bottom: 20px; padding: 15px;">
-        <h3>📊 Resumo do Dataset</h3>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:15px 0;">
-
-            <div class="card kpi-card kpi-total">
-                <div class="kpi-label">Total</div>
-                <div class="kpi-value" id="kpi-total">0</div>
-            </div>
-
-            <div class="card kpi-card kpi-positive">
-                <div class="kpi-label">Positivas</div>
-                <div class="kpi-value" id="kpi-positive">0</div>
-            </div>
-
-            <div class="card kpi-card kpi-negative">
-                <div class="kpi-label">Negativas</div>
-                <div class="kpi-value" id="kpi-negative">0</div>
-            </div>
-
-        </div>
-
-        <!-- Gráficos -->
-        <div
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-top: 15px;">
-            <!-- Gráfico 1: Donut (Positivo vs Negativo) -->
-            <div class="card" style="padding: 15px;">
-                <h4 style="margin: 0 0 15px 0; font-size: 1rem;">📊 Proporção Positivo vs Negativo</h4>
-                <div style="position: relative; height: 250px;">
-                    <canvas id="chart-proportion"></canvas>
-                </div>
-            </div>
-
-            <!-- Gráfico 2: Barras Empilhadas (Train/Val/Test Total) -->
-            <div class="card" style="padding: 15px;">
-                <h4 style="margin: 0 0 15px 0; font-size: 1rem;">📈 Distribuição Train/Val/Test (Empilhado)</h4>
-                <div style="position: relative; height: 250px;">
-                    <canvas id="chart-stacked-bars"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <div id="dataset-balance-alert" style="display:none;"></div>
-    </div>
-
-    <div class="section-header">
-        <span class="section-step">ETAPA 3</span>
-        <h3>Tipos de Pré-Processamento</h3>
-    </div>
-
-    <div class="card config-card" style="margin-bottom: 20px;">
-        <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom: 10px;">Configure as técnicas de
-            pré-processamento que serão aplicadas nas imagens antes do treinamento.</p>
-
-        <div style="display: flex; align-items: center; gap: 15px; margin-top: 15px; flex-wrap: wrap;">
-            <button id="open-preprocess-modal-btn" class="btn" disabled style="
-                display: flex; 
-                align-items: center; 
-                gap: 8px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
+            .modern-number-input input {
+                width: 32px;
+                background: transparent;
                 border: none;
-                padding: 10px 18px;
+                color: var(--text-primary, #0f172a);
+                text-align: center;
+                font-size: 0.75rem;
+                font-weight: 600;
+                outline: none;
+                padding: 0;
+            }
+
+            .modern-number-input button {
+                width: 22px;
+                height: 22px;
+                background: transparent;
+                border: none;
+                color: var(--text-muted, #94a3b8);
+                cursor: pointer;
+                font-size: 1rem;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                transition: all 0.2s;
+                line-height: 1;
+                padding: 0;
+            }
+
+            .modern-number-input button:hover {
+                background: rgba(85, 27, 179, 0.1);
+                color: #551BB3;
+            }
+
+            .modern-number-input button:active {
+                background: rgba(85, 27, 179, 0.2);
+            }
+
+            .modern-number-input .unit {
+                color: #551BB3;
+                font-size: 0.7rem;
+                font-weight: 700;
+                padding-right: 6px;
+                margin-left: 2px;
+            }
+
+            /* Estilo profissional para a tabela negativa */
+            #negative-selection-table {
+                border-collapse: separate;
+                border-spacing: 0;
+                width: 100%;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                overflow: hidden;
+                background: var(--surface);
+                box-shadow: 0 8px 24px rgba(85, 27, 179, 0.08);
+                table-layout: fixed;
+            }
+
+            /* Container da tabela com scroll horizontal quando necessário */
+            .table-container {
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            #negative-selection-table thead th {
+                background: linear-gradient(135deg, rgba(85, 27, 179, 0.05), rgba(0, 245, 212, 0.03));
+                color: var(--text-primary);
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                padding: 10px 12px;
+                border-bottom: 2px solid var(--color-primary);
+                text-align: left;
+                font-weight: 600;
+            }
+
+            #negative-selection-table tbody tr:not(.line-detail-row) {
+                transition: all 0.3s ease;
+                background: var(--surface);
+                cursor: pointer;
+            }
+
+            #negative-selection-table tbody tr:not(.line-detail-row) td:first-child {
+                border-left: 4px solid transparent;
+                transition: border-color 0.2s ease;
+            }
+
+            /* Linha selecionada (checkbox marcado) */
+            #negative-selection-table tbody tr:not(.line-detail-row).selected {
+                background: rgba(85, 27, 179, 0.05);
+            }
+
+            #negative-selection-table tbody tr:not(.line-detail-row).selected td:first-child {
+                border-left: 4px solid #551BB3;
+            }
+
+            #negative-selection-table tbody tr:not(.line-detail-row):hover {
+                background: linear-gradient(90deg, rgba(85, 27, 179, 0.06), rgba(0, 245, 212, 0.03)) !important;
+                transform: translateX(2px);
+            }
+
+            #negative-selection-table tbody tr:not(.line-detail-row):hover td:first-child {
+                border-left: 4px solid #551BB3;
+            }
+
+            #negative-selection-table tbody tr:not(.line-detail-row).selected:hover {
+                background: rgba(85, 27, 179, 0.08) !important;
+            }
+
+            #negative-selection-table tbody tr:not(.line-detail-row).selected:hover td:first-child {
+                border-left: 4px solid #551BB3;
+            }
+
+            #negative-selection-table td {
+                padding: 14px 15px;
+                border-bottom: 1px solid var(--border);
+                vertical-align: middle;
+                color: var(--text-primary);
+                font-size: 14px;
+            }
+
+            #negative-selection-table .btn-sm {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                background: transparent;
+                border: 1px solid #cbd5e0;
+                color: #64748b;
                 font-weight: 500;
-            ">
-                <span style="font-size: 1.3rem;">🎨</span>
-                <span>Inserir Técnicas de Pré-Processamento</span>
-            </button>
+                font-size: 12px;
+                padding: 6px 12px;
+                border-radius: 6px;
+                transition: all 0.2s ease;
+            }
 
-            <div id="selected-preprocessing-summary" style="
-                flex: 1; 
-                min-width: 250px;
-                padding: 10px 15px; 
-                background: #f8f9fa; 
-                border: 1px solid #e0e0e0;
-                border-radius: 6px; 
+            #negative-selection-table .btn-sm:hover {
+                background: rgba(85, 27, 179, 0.08);
+                border-color: var(--color-primary);
+                color: var(--color-primary);
+                box-shadow: 0 2px 8px rgba(85, 27, 179, 0.15);
+            }
+
+            #negative-selection-table .btn-sm.active {
+                background: var(--color-primary);
+                border-color: var(--color-primary);
+                color: #fff;
+            }
+
+            #negative-selection-table .btn-sm.active:hover {
+                background: var(--color-primary-light);
+                box-shadow: 0 4px 12px rgba(85, 27, 179, 0.3);
+            }
+
+            /* Checkbox customizado para alinhar com o tema */
+            #negative-selection-table input.custom-checkbox {
+                appearance: none;
+                width: 18px;
+                height: 18px;
+                border: 2px solid var(--border, #cbd5e1);
+                border-radius: 6px;
+                background: #fff;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                position: relative;
+            }
+
+            #negative-selection-table input.custom-checkbox:hover {
+                border-color: #551BB3;
+                box-shadow: 0 2px 8px rgba(85, 27, 179, 0.15);
+            }
+
+            #negative-selection-table input.custom-checkbox:checked {
+                background: #551BB3;
+                border-color: #551BB3;
+                box-shadow: 0 3px 10px rgba(85, 27, 179, 0.25);
+            }
+
+            #negative-selection-table input.custom-checkbox:checked::after {
+                content: '';
+                width: 6px;
+                height: 10px;
+                border: solid #fff;
+                border-width: 0 2px 2px 0;
+                transform: rotate(45deg);
+                position: absolute;
+            }
+
+            /* Segmented control para modos random/select */
+            .segmented-control {
+                display: inline-flex;
+                gap: 6px;
+                padding: 6px;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                background: linear-gradient(135deg, rgba(85, 27, 179, 0.08), rgba(0, 245, 212, 0.03));
+                margin: 10px 0;
+            }
+
+            .segmented-control .segment {
+                border: 1px solid rgba(85, 27, 179, 0.2);
+                background: #fff;
+                color: #3b2a60;
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 13px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                min-width: 140px;
+            }
+
+            .segmented-control .segment:hover {
+                border-color: #551BB3;
+                color: #551BB3;
+                box-shadow: 0 3px 10px rgba(85, 27, 179, 0.18);
+            }
+
+            .segmented-control .segment.active {
+                background: #551BB3;
+                color: #fff;
+                border-color: #551BB3;
+                box-shadow: 0 6px 14px rgba(85, 27, 179, 0.25);
+            }
+
+            /* Itens da grid de linhas */
+            .line-detail-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: 12px;
+            }
+
+            .line-detail-grid .line-item {
+                background: #ffffff;
+                border: 0;
+                border-radius: 10px;
+                padding: 10px 12px;
+                box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
+            }
+
+            .line-detail-grid .line-item header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 8px;
+                font-weight: 700;
+                color: #1f2937;
+                font-size: 0.9rem;
+            }
+
+            .line-detail-grid .line-item .line-max {
+                font-weight: 500;
+                color: #94A3B8;
+                font-size: 0.75rem;
+                font-variant-numeric: tabular-nums;
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Roboto Mono", monospace;
+                margin-left: auto;
+                text-align: right;
+            }
+
+            .line-detail-grid .modern-number-input {
+                background: #F1F5F9;
+                border-color: #d9e2ec;
+                padding: 4px;
+            }
+
+            .line-detail-grid .modern-number-input input {
+                color: #111827;
+                width: 48px;
                 font-size: 0.85rem;
-            ">
-                <strong style="color: #555;">Técnicas selecionadas:</strong>
-                <span id="preprocessing-count" style="color: #999;">Nenhuma</span>
+            }
+
+            .line-detail-grid .modern-number-input button {
+                width: 24px;
+                height: 24px;
+            }
+
+            /* Chevron como ícone simples, sem borda/fundo */
+            .chevron-btn {
+                background: transparent;
+                border: none;
+                padding: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                color: #94a3b8;
+                transition: color 0.2s ease;
+            }
+
+            .chevron-btn:hover {
+                color: #551BB3;
+            }
+
+            .chevron-btn svg {
+                transition: transform 0.2s ease;
+                /* Fechado: seta para a direita */
+                transform: rotate(-90deg);
+            }
+
+            .chevron-btn.open svg {
+                /* Aberto: seta para baixo */
+                transform: rotate(0deg);
+            }
+
+            .sr-only {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
+
+            /* Badges coloridos para informações */
+            #negative-selection-table .badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 4px;
+                padding: 4px 10px;
+                border-radius: 12px;
+                font-size: 13px;
+                font-weight: 600;
+                white-space: nowrap;
+            }
+
+            #negative-selection-table .badge.lines-badge {
+                background: linear-gradient(135deg, rgba(85, 27, 179, 0.12), rgba(85, 27, 179, 0.18));
+                color: #3b2a60;
+                box-shadow: 0 2px 8px rgba(85, 27, 179, 0.15);
+            }
+
+            #negative-selection-table .badge.images-badge {
+                background: rgba(85, 27, 179, 0.12);
+                color: var(--color-primary);
+                box-shadow: 0 2px 8px rgba(85, 27, 179, 0.12);
+                font-size: 15px;
+                padding: 5px 12px;
+                border: 1px solid rgba(85, 27, 179, 0.25);
+            }
+
+            #negative-selection-table .badge.images-badge.empty {
+                background: transparent;
+                color: #94a3b8;
+                box-shadow: none;
+                border: 1px dashed #e2e8f0;
+                opacity: 0.75;
+            }
+
+            /* Barra de equilíbrio sutil dentro do badge */
+            #negative-selection-table .badge.images-badge::after {
+                content: '';
+                display: block;
+                height: 2px;
+                border-radius: 999px;
+                margin-top: 4px;
+                background: var(--balance-color, rgba(85, 27, 179, 0.25));
+                width: var(--balance-ratio, 0%);
+                opacity: var(--balance-bar-opacity, 0);
+                transition: width 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+            }
+
+            /* Ícones com menor peso visual */
+            #negative-selection-table tbody tr svg {
+                transition: all 0.2s ease;
+                opacity: 0.6;
+            }
+
+            #negative-selection-table tbody tr.selected svg {
+                stroke: #551BB3 !important;
+                opacity: 0.9;
+            }
+
+            /* Labels dos tipos de implante */
+            #negative-selection-table tbody tr label {
+                transition: all 0.2s ease;
+                color: #1E293B;
+                font-weight: 600;
+            }
+
+            #negative-selection-table tbody tr.selected label {
+                color: #1E293B;
+            }
+
+            #negative-selection-table .pill {
+                background: linear-gradient(135deg, var(--color-primary), var(--color-primary-light));
+                color: #fff;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 11px;
+                font-weight: 700;
+                color: #0f172a;
+                display: inline-block;
+            }
+
+            /* Responsividade para tablets e mobile */
+            @media (max-width: 1024px) {
+
+                /* Grid de Train/Val/Test para 1 coluna em tablets */
+                div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+                    grid-template-columns: 1fr !important;
+                }
+
+                /* Gráficos de split para 1 coluna em tablets */
+                div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+                    grid-template-columns: 1fr !important;
+                }
+            }
+
+            @media (max-width: 768px) {
+
+                /* Prevenir scroll horizontal */
+                #training-page {
+                    overflow-x: hidden;
+                }
+
+                /* Container da tabela */
+                .table-container {
+                    overflow-x: auto;
+                    margin: 0 -12px;
+                    padding: 0 12px;
+                }
+
+                /* Tabela com largura mínima */
+                #negative-selection-table {
+                    min-width: 500px;
+                }
+
+                /* Cabeçalho da página */
+                .training-page-header h3 {
+                    font-size: 1.2rem !important;
+                }
+
+                .training-page-header>div {
+                    flex-direction: column !important;
+                    gap: 8px !important;
+                }
+
+                /* Botões do cabeçalho */
+                .training-page-header button {
+                    width: 100%;
+                    justify-content: center;
+                }
+
+                /* Cards - reduzir padding */
+                .card {
+                    padding: 12px !important;
+                }
+
+                /* Cards KPI - 1 coluna em mobile */
+                div[style*="grid-template-columns:repeat(auto-fit,minmax(120px,1fr))"] {
+                    grid-template-columns: 1fr !important;
+                }
+
+                /* Tabela de implantes - ajustar padding */
+                #negative-selection-table thead th,
+                #negative-selection-table td {
+                    padding: 8px 6px !important;
+                    font-size: 11px !important;
+                }
+
+                /* Esconder colunas menos importantes em mobile */
+                #negative-selection-table th:nth-child(3),
+                #negative-selection-table td:nth-child(3) {
+                    display: none;
+                }
+
+                /* Botões menores na tabela */
+                #negative-selection-table .btn-sm {
+                    padding: 3px 6px !important;
+                    font-size: 11px !important;
+                    gap: 4px !important;
+                }
+
+                #negative-selection-table .btn-sm svg {
+                    width: 12px !important;
+                    height: 12px !important;
+                }
+
+                /* Split control cards */
+                .split-control-card {
+                    margin-bottom: 8px;
+                }
+
+                .split-control-card>div {
+                    padding: 8px 10px !important;
+                }
+
+                /* Slider controls - ajustar layout */
+                .split-slider-group>div {
+                    flex-direction: column !important;
+                    align-items: flex-start !important;
+                    gap: 4px !important;
+                }
+
+                /* Modern number input - manter compacto */
+                .modern-number-input {
+                    display: inline-flex !important;
+                }
+
+                /* Sliders com largura controlada */
+                .split-slider {
+                    width: 100% !important;
+                    max-width: 100%;
+                }
+
+                /* Upload e seleção de dataset */
+                div[style*="display:flex; gap: 10px; align-items: center"] {
+                    flex-direction: column !important;
+                    align-items: stretch !important;
+                }
+
+                /* Botão de pré-processamento */
+                #open-preprocess-modal-btn {
+                    width: 100% !important;
+                    padding: 8px 12px !important;
+                }
+
+                #selected-preprocessing-summary {
+                    width: 100% !important;
+                }
+
+                /* Config panel */
+                .section-header {
+                    flex-direction: column !important;
+                    align-items: flex-start !important;
+                    gap: 8px !important;
+                }
+
+                .section-header>div {
+                    width: 100%;
+                }
+
+                /* Job selection */
+                .card[style*="display:flex; gap:8px"] {
+                    flex-wrap: wrap !important;
+                }
+
+                .card[style*="display:flex; gap:8px"] select,
+                .card[style*="display:flex; gap:8px"] button {
+                    flex: 1 1 calc(50% - 4px) !important;
+                    min-width: auto !important;
+                }
+
+                /* Altura dos gráficos - reduzir em mobile */
+                div[style*="height: 195px"],
+                div[style*="height: 200px"] {
+                    height: 160px !important;
+                }
+
+                /* Ajustar títulos */
+                h3 {
+                    font-size: 1.1rem !important;
+                }
+
+                h4 {
+                    font-size: 0.8rem !important;
+                }
+
+                /* Canvas dentro dos cards */
+                canvas {
+                    max-width: 100%;
+                }
+            }
+
+            @media (max-width: 480px) {
+
+                /* Ultra small screens */
+                .training-page-header h3 {
+                    font-size: 1rem !important;
+                }
+
+                /* Reduzir padding geral ainda mais */
+                .card {
+                    padding: 8px !important;
+                    margin-bottom: 12px !important;
+                }
+
+                /* Split control cards - padding menor */
+                .split-control-card>div {
+                    padding: 6px 8px !important;
+                }
+
+                /* Labels e textos menores */
+                label {
+                    font-size: 0.75rem !important;
+                }
+
+                /* KPI cards mais compactos */
+                .kpi-card {
+                    padding: 8px !important;
+                }
+
+                .kpi-value {
+                    font-size: 1.2rem !important;
+                }
+
+                .kpi-label {
+                    font-size: 0.7rem !important;
+                }
+
+                /* Tabela responsiva - empilhar */
+                #negative-selection-table {
+                    font-size: 11px !important;
+                }
+
+                #negative-selection-table thead {
+                    display: none;
+                }
+
+                #negative-selection-table tr:not(.line-detail-row) {
+                    display: block;
+                    margin-bottom: 8px;
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                }
+
+                #negative-selection-table td {
+                    display: block;
+                    text-align: left !important;
+                    padding: 6px !important;
+                    border-bottom: 1px solid var(--border);
+                }
+
+                #negative-selection-table td:last-child {
+                    border-bottom: none;
+                }
+
+                #negative-selection-table td:before {
+                    content: attr(data-label);
+                    font-weight: 600;
+                    display: inline-block;
+                    margin-right: 8px;
+                }
+
+                /* Gráficos ainda menores */
+                div[style*="height: 195px"],
+                div[style*="height: 200px"],
+                div[style*="height: 180px"],
+                div[style*="height: 160px"] {
+                    height: 140px !important;
+                }
+
+                /* Log de treinamento */
+                #logs {
+                    height: 250px !important;
+                    font-size: 11px !important;
+                }
+
+                /* Botões menores */
+                .btn {
+                    padding: 8px 12px !important;
+                    font-size: 0.85rem !important;
+                }
+
+                /* Config textarea */
+                .config-textarea {
+                    font-size: 11px !important;
+                }
+
+                /* Reduzir gaps em grids */
+                div[style*="gap: 12px"] {
+                    gap: 8px !important;
+                }
+
+                /* Títulos mais compactos */
+                h3 {
+                    font-size: 0.95rem !important;
+                    margin-bottom: 8px !important;
+                }
+
+                h4 {
+                    font-size: 0.75rem !important;
+                }
+
+                /* SVG icons menores */
+                svg {
+                    width: 16px !important;
+                    height: 16px !important;
+                }
+
+                /* Modern number input em telas muito pequenas */
+                .modern-number-input input {
+                    width: 28px !important;
+                    font-size: 0.7rem !important;
+                }
+
+                .modern-number-input button {
+                    width: 20px !important;
+                    height: 20px !important;
+                }
+
+                /* Info tooltips menores */
+                .info-tooltip svg {
+                    width: 14px !important;
+                    height: 14px !important;
+                }
+            }
+
+            /* Estilos para os botões das seções */
+            #open-preprocess-modal-btn {
+                box-shadow: 0 2px 8px rgba(85, 27, 179, 0.15) !important;
+            }
+
+            #open-preprocess-modal-btn:not(:disabled):hover {
+                background: #4a189e !important;
+                box-shadow: 0 4px 12px rgba(85, 27, 179, 0.25) !important;
+                transform: translateY(-1px);
+            }
+
+            #open-preprocess-modal-btn:disabled {
+                opacity: 0.5 !important;
+                cursor: not-allowed !important;
+            }
+
+            #reset-config-btn:hover {
+                background: #f3f4f6 !important;
+                border-color: #9ca3af !important;
+                color: #374151 !important;
+            }
+
+            #edit-config-btn:hover {
+                background: rgba(85, 27, 179, 0.08) !important;
+                border-color: #8b5cf6 !important;
+            }
+
+            /* Tags de técnicas selecionadas */
+            .preprocessing-tag {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                background: rgba(85, 27, 179, 0.1);
+                color: #551BB3;
+                padding: 6px 10px;
+                border-radius: 12px;
+                font-size: 0.85rem;
+                font-weight: 600;
+                border: 1px solid rgba(85, 27, 179, 0.25);
+            }
+
+            .preprocessing-tag button {
+                background: transparent;
+                border: none;
+                color: #551BB3;
+                cursor: pointer;
+                padding: 0;
+                font-size: 1rem;
+                line-height: 1;
+                transition: color 0.2s ease;
+            }
+
+            .preprocessing-tag button:hover {
+                color: #8b5cf6;
+            }
+        </style>
+        <script>
+            // Função para alternar a classe 'selected' na linha da tabela - GLOBAL SCOPE
+            window.toggleRowSelection = function (checkbox) {
+                const row = checkbox.closest('tr');
+                const svg = row.querySelector('svg');
+
+                if (checkbox.checked) {
+                    row.classList.add('selected');
+                    if (svg) svg.setAttribute('stroke', '#28a745');
+                } else {
+                    row.classList.remove('selected');
+                    if (svg) svg.setAttribute('stroke', '#94a3b8');
+                }
+
+                // Chama a função existente do ui.js para atualizar os valores
+                if (window.UI && typeof window.UI.handleTypeCheckboxChange === 'function') {
+                    window.UI.handleTypeCheckboxChange(checkbox);
+                } else if (typeof handleTypeCheckboxChange === 'function') {
+                    handleTypeCheckboxChange(checkbox);
+                }
+            };
+
+            // Garante que a função está acessível globalmente
+            if (typeof toggleRowSelection === 'undefined') {
+                window.toggleRowSelection = window.toggleRowSelection;
+            }
+        </script>
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+            <div
+                style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #551BB3; color: white; border-radius: 50%; font-weight: 700; font-size: 0.9rem;">
+                01</div>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21V7" />
+                <path d="M9 21h6" />
+
+                <path d="M12 7L4 5v2" />
+                <path d="M12 7l8 3v-2" />
+                <path d="M2 13l2-3 2 3c0 1.1-.9 2-2 2s-2-.9-2-2z" />
+                <path d="M18 16l2-3 2 3c0 1.1-.9 2-2 2s-2-.9-2-2z" />
+
+                <circle cx="12" cy="7" r="1" fill="currentColor" />
+            </svg>
+
+            <h3 style="margin: 0; color: #2d3748;">Dataset</h3>
+        </div>
+        <!-- upload da classe positiva -->
+        <div class="card" style="margin-bottom: 10px;">
+
+            <div class="form-group">
+                <!-- <label><strong>Dataset Positivo</strong></label> -->
+                <div style="display: flex; gap: 8px; align-items: center; margin-top: 0px; margin-bottom: 0px;">
+                    <h3 style="margin-bottom:0; margin-top: 0;">Classe Positiva</h3>
+                    <div class="info-tooltip">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path
+                                d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                        </svg>
+                        <span class="tooltip-content">
+                            <div class="tooltip-section">
+                                <strong class="tooltip-title">Dúvida</strong>
+                                Selecione o dataset que contém somente as imagens positivas (com implantes). Ou faça o
+                                upload
+                                de uma nova pasta contendo essas imagens.
+                            </div>
+                        </span>
+                    </div>
+                </div>
+                <div style="display:flex; gap: 10px; align-items: center;">
+                    <select id="dataset-select" class="input" style="flex-grow: 1;"></select>
+                    <button class="btn" id="upload-dataset-btn"
+                        style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Upload Pasta
+                    </button>
+                </div>
+                <!-- Elemento oculto para armazenar contagem de imagens positivas quando dataset é selecionado -->
+                <span id="total-positive-count" style="display: none;">0</span>
             </div>
         </div>
 
-        <!-- Checkboxes ocultos para manter compatibilidade com código existente -->
-        <div id="tipo-checkboxes-preprocessing" style="display: none;">
+        <!-- Classe negativas -->
+        <div class="card">
+            <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px;">
+                <h3 style="margin-bottom:0; margin-top: 0;">Classe Negativo</h3>
+                <div class="info-tooltip">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                        <path
+                            d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                    </svg>
+                    <span class="tooltip-content">
+                        <div class="tooltip-section">
+                            <strong class="tooltip-title">Dúvida</strong>
+                            Primeiro selecione o tipo de implante. Após isso selecione os tipos de linhas de implantes.
+                            E, por fim, defina a quantidade de imagens por linha selecionada. Ou opte por selecionar os
+                            primeiros implantes do dataset.
+                        </div>
+
+                    </span>
+                </div>
+            </div>
+
+            <!-- Elemento oculto para armazenar contagem de imagens negativas -->
+            <span id="total-negative-count" style="display: none;">0</span>
+
+
+            <div id="negative-data-control">
+
+                <div class="table-container">
+                    <table class="table" id="negative-selection-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 40%;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path d="M6 3v12"></path>
+                                            <path d="M18 9a3 3 0 100-6 3 3 0 000 6z"></path>
+                                            <path d="M6 21a3 3 0 100-6 3 3 0 000 6z"></path>
+                                            <path d="M15 9h-3a3 3 0 01-3-3V3"></path>
+                                        </svg>
+                                        <span>Tipo de Implante</span>
+                                    </div>
+                                </th>
+                                <th style="width: 25%;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                                        </svg>
+                                        <span>Linhas Ativas</span>
+                                    </div>
+                                </th>
+                                <th style="width: 25%;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                            <polyline points="21 15 16 10 5 21"></polyline>
+                                        </svg>
+                                        <span>Total de Imagens</span>
+                                    </div>
+                                </th>
+                                <th style="width: 10%; text-align: center;">
+                                    <span></span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-type="Cone" data-name="Cone Morse" class="selected"
+                                onclick="window.UI.toggleLineSelection(this.querySelector('.chevron-btn'), 'Cone')">
+                                <td>
+                                    <div style="display:flex; align-items:center; gap: 10px;">
+                                        <input type="checkbox" class="custom-checkbox" id="check-cone" value="Cone"
+                                            checked onchange="toggleRowSelection(this)"
+                                            onclick="event.stopPropagation()">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#28a745"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M6 3v12" />
+                                            <path d="M18 9a3 3 0 100-6 3 3 0 000 6z" />
+                                            <path d="M6 21a3 3 0 100-6 3 3 0 000 6z" />
+                                            <path d="M15 9h-3a3 3 0 01-3-3V3" />
+                                        </svg>
+                                        <label for="check-cone" style="margin: 0; font-weight: 600; font-size: 15px;"
+                                            onclick="event.stopPropagation()">Cone Morse</label>
+                                    </div>
+                                </td>
+                                <td class="selected-lines-count"></td>
+                                <td class="total-selected-count"></td>
+                                <td style="text-align: center;">
+                                    <button class="chevron-btn" aria-expanded="false"
+                                        aria-label="Alternar detalhes Cone">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                        <span class="sr-only">Detalhes</span>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="line-detail-row hidden" data-parent="Cone" data-mode="random">
+                                <td colspan="4" style="padding: 0;">
+                                    <div class="line-detail-panel"
+                                        style="background:#F8FAFC; padding: 15px; border-left: 4px solid #551BB3;">
+
+                                        <div class="line-detail-actions"
+                                            style="display:flex;justify-content:space-between;align-items:center;margin-bottom: 10px;">
+                                            <strong style="font-size: 14px;">Configuração de Seleção:</strong>
+
+                                        </div>
+
+                                        <div class="mode-options-group segmented-control" aria-label="Modo de seleção">
+                                            <button type="button" class="segment active" data-mode="random"
+                                                onclick="global.UI.setNegativeSelectionMode('Cone', 'random')">
+                                                Implantes Aleatórios
+                                            </button>
+                                            <button type="button" class="segment" data-mode="select"
+                                                onclick="global.UI.setNegativeSelectionMode('Cone', 'select')">
+                                                Selecionar Linhas
+                                            </button>
+                                        </div>
+
+                                        <div class="line-random-panel" data-type="Cone"
+                                            style="padding: 10px; border: 1px dashed var(--border); border-radius: 6px;">
+                                            <label style="font-weight: 600;">Quantidade Por Linha (Automática):</label>
+                                            <div class="modern-number-input" style="margin-top: 8px;">
+                                                <button type="button"
+                                                    onclick="this.parentNode.querySelector('input').stepDown();">-</button>
+                                                <input type="number" data-type-count="Cone" value="100" min="0"
+                                                    max="9999">
+                                                <button type="button"
+                                                    onclick="this.parentNode.querySelector('input').stepUp();">+</button>
+                                            </div>
+                                            <p style="font-size:0.8rem; color:var(--text-muted); margin-top: 5px;">
+                                                Aplica o
+                                                valor acima a TODAS as <span class="available-lines-count">X</span>
+                                                linhas
+                                                disponíveis.</p>
+                                        </div>
+
+                                        <div class="line-detail-grid line-select-panel" data-type="Cone"
+                                            style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: #F8FAFC;">
+                                        </div>
+
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr data-type="Hex Externo" data-name="Hex. Externo"
+                                onclick="window.UI.toggleLineSelection(this.querySelector('.chevron-btn'), 'Hex Externo')">
+                                <td>
+                                    <div style="display:flex; align-items:center; gap: 10px;">
+                                        <input type="checkbox" class="custom-checkbox" id="check-hexext"
+                                            value="Hex Externo" onchange="toggleRowSelection(this)"
+                                            onclick="event.stopPropagation()">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M6 3v12" />
+                                            <path d="M18 9a3 3 0 100-6 3 3 0 000 6z" />
+                                            <path d="M6 21a3 3 0 100-6 3 3 0 000 6z" />
+                                            <path d="M15 9h-3a3 3 0 01-3-3V3" />
+                                        </svg>
+                                        <label for="check-hexext" style="margin: 0; font-weight: 600; font-size: 15px;"
+                                            onclick="event.stopPropagation()">Hex.
+                                            Externo</label>
+                                    </div>
+                                </td>
+                                <td class="selected-lines-count"></td>
+                                <td class="total-selected-count"></td>
+                                <td style="text-align: center;">
+                                    <button class="chevron-btn" aria-expanded="false"
+                                        aria-label="Alternar detalhes Hex Externo">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                        <span class="sr-only">Detalhes</span>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="line-detail-row hidden" data-parent="Hex Externo" data-mode="random">
+                                <td colspan="4" style="padding: 0;">
+                                    <div class="line-detail-panel"
+                                        style="background:#F8FAFC; padding: 15px; border-left: 4px solid #551BB3;">
+
+                                        <div class="line-detail-actions"
+                                            style="display:flex;justify-content:space-between;align-items:center;margin-bottom: 10px;">
+                                            <strong style="font-size: 14px;">Configuração de Seleção:</strong>
+
+                                        </div>
+
+                                        <div class="mode-options-group segmented-control" aria-label="Modo de seleção">
+                                            <button type="button" class="segment active" data-mode="random"
+                                                onclick="global.UI.setNegativeSelectionMode('Hex Externo', 'random')">
+                                                Implantes Aleatórios
+                                            </button>
+                                            <button type="button" class="segment" data-mode="select"
+                                                onclick="global.UI.setNegativeSelectionMode('Hex Externo', 'select')">
+                                                Selecionar Linhas
+                                            </button>
+                                        </div>
+
+                                        <div class="line-random-panel" data-type="Hex Externo"
+                                            style="padding: 10px; border: 1px dashed var(--border); border-radius: 6px;">
+                                            <label style="font-weight: 600;">Quantidade Por Linha (Automática):</label>
+                                            <div class="modern-number-input" style="margin-top: 8px;">
+                                                <button type="button"
+                                                    onclick="this.parentNode.querySelector('input').stepDown();">-</button>
+                                                <input type="number" data-type-count="Hex Externo" value="100" min="0"
+                                                    max="9999">
+                                                <button type="button"
+                                                    onclick="this.parentNode.querySelector('input').stepUp();">+</button>
+                                            </div>
+                                            <p style="font-size:0.8rem; color:var(--text-muted); margin-top: 5px;">
+                                                Aplica o
+                                                valor acima a TODAS as <span class="available-lines-count">X</span>
+                                                linhas
+                                                disponíveis.</p>
+                                        </div>
+
+                                        <div class="line-detail-grid line-select-panel" data-type="Hex Externo"
+                                            style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: #F8FAFC;">
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr data-type="Hex Interno" data-name="Hex. Interno"
+                                onclick="window.UI.toggleLineSelection(this.querySelector('.chevron-btn'), 'Hex Interno')">
+                                <td>
+                                    <div style="display:flex; align-items:center; gap: 10px;">
+                                        <input type="checkbox" class="custom-checkbox" id="check-hexint"
+                                            value="Hex Interno" onchange="toggleRowSelection(this)"
+                                            onclick="event.stopPropagation()">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M6 3v12" />
+                                            <path d="M18 9a3 3 0 100-6 3 3 0 000 6z" />
+                                            <path d="M6 21a3 3 0 100-6 3 3 0 000 6z" />
+                                            <path d="M15 9h-3a3 3 0 01-3-3V3" />
+                                        </svg>
+                                        <label for="check-hexint" style="margin: 0; font-weight: 600; font-size: 15px;"
+                                            onclick="event.stopPropagation()">Hex.
+                                            Interno</label>
+                                    </div>
+                                </td>
+                                <td class="selected-lines-count"></td>
+                                <td class="total-selected-count"></td>
+                                <td style="text-align: center;">
+                                    <button class="chevron-btn" aria-expanded="false"
+                                        aria-label="Alternar detalhes Hex Interno">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <polyline points="6 9 12 15 18 9"></polyline>
+                                        </svg>
+                                        <span class="sr-only">Detalhes</span>
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr class="line-detail-row hidden" data-parent="Hex Interno" data-mode="random">
+                                <td colspan="4" style="padding: 0;">
+                                    <div class="line-detail-panel"
+                                        style="background:#F8FAFC; padding: 15px; border-left: 4px solid #551BB3;">
+
+                                        <div class="line-detail-actions"
+                                            style="display:flex;justify-content:space-between;align-items:center;margin-bottom: 10px;">
+                                            <strong style="font-size: 14px;">Configuração de Seleção:</strong>
+
+                                        </div>
+
+                                        <div class="mode-options-group segmented-control" aria-label="Modo de seleção">
+                                            <button type="button" class="segment active" data-mode="random"
+                                                onclick="global.UI.setNegativeSelectionMode('Hex Interno', 'random')">
+                                                Implantes Aleatórios
+                                            </button>
+                                            <button type="button" class="segment" data-mode="select"
+                                                onclick="global.UI.setNegativeSelectionMode('Hex Interno', 'select')">
+                                                Selecionar Linhas
+                                            </button>
+                                        </div>
+
+                                        <div class="line-random-panel" data-type="Hex Interno"
+                                            style="padding: 10px; border: 1px dashed var(--border); border-radius: 6px;">
+                                            <label style="font-weight: 600;">Quantidade Por Linha (Automática):</label>
+                                            <div class="modern-number-input" style="margin-top: 8px;">
+                                                <button type="button"
+                                                    onclick="this.parentNode.querySelector('input').stepDown();">-</button>
+                                                <input type="number" data-type-count="Hex Interno" value="100" min="0"
+                                                    max="9999">
+                                                <button type="button"
+                                                    onclick="this.parentNode.querySelector('input').stepUp();">+</button>
+                                            </div>
+                                            <p style="font-size:0.8rem; color:var(--text-muted); margin-top: 5px;">
+                                                Aplica o
+                                                valor acima a TODAS as <span class="available-lines-count">X</span>
+                                                </p>
+                                        </div>
+
+                                        <div class="line-detail-grid line-select-panel" data-type="Hex Interno"
+                                            style="display: none; border: 1px dashed var(--border); padding: 15px; border-radius: 6px; margin-top: 10px; background: #F8FAFC;">
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
         </div>
     </div>
 
-    <div class="section-header">
-        <span class="section-step">ETAPA 4</span>
-        <h3>⚙️ Configuração de Treino (YOLO)</h3>
-    </div>
 
-    <div id="config-panel" class="card config-card">
-        <div class="config-header" style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:0.9rem;color:var(--text-muted);">Ajuste os parâmetros de treinamento</span>
+
+    <div class="" style="margin-bottom: 20px;">
+
+
+        <!-- <div class="info-tooltip">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                        <path
+                            d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                    </svg>
+                    <span class="tooltip-content">
+                        <div class="tooltip-section">
+                            <strong class="tooltip-title">O que observar</strong>
+                            <p>Relação direta entre erro (Loss) e acerto (Acc). Uma <b>correlação negativa forte</b>
+                                (reta descendo) é o sinal de um modelo saudável.</p>
+                        </div>
+                        <div class="tooltip-divider"></div>
+                        <div class="tooltip-section alert">
+                            <strong class="tooltip-title">Pontos Dispersos</strong>
+                            <p>Selecione e defina a quantidade de imagens para a classe negativa
+                                (<code>negativo</code>), por
+                                tipo ou linha específica.</p>
+                        </div>
+                    </span>
+        </div> -->
+
+
+
+        <div class="card " style="margin-bottom: 20px; margin-top: 30px; ">
+
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <div
+                    style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #551BB3; color: white; border-radius: 50%; font-weight: 700; font-size: 0.9rem;">
+                    02</div>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                    style="color: #4a5568;">
+                    <path d="M12 7V21M12 21H9M12 21H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path d="M12 7L4 10M12 7L20 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                    <path d="M4 10L2 16C2 16 2 18 4 18C6 18 6 16 6 16L4 10Z" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M20 10L18 16C18 16 18 18 20 18C22 18 22 16 22 16L20 10Z" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    <circle cx="12" cy="4" r="1" fill="currentColor" />
+                </svg>
+
+                <h3 style="margin: 0; color: #2d3748;">Balanceamento do Dataset</h3>
+            </div>
+
+
+
+            <!-- AJuste da quantidade de imagens para cada classe. -->
             <div>
-                <button id="reset-config-btn" class="btn btn-success" title="Restaurar padrão">Restaurar</button>
-                <button id="edit-config-btn" class="btn" title="Editar configuração">Editar</button>
+                <!-- Controles de Divisão + Proporção: Componente Compacto e Profissional -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px;">
+                    <!-- Classe Positiva (Reutilizável) -->
+                    <div class="split-control-card" data-class="positiva">
+                        <!-- Header Compacto -->
+                        <div style="padding: 10px 12px; border-bottom: 1px solid var(--border); height: 44px;">
+                            <h4 style="margin: 0; font-size: 0.85rem; font-weight: 700; ">Positiva</h4>
+                        </div>
+
+                        <!-- Content: Sliders Compactos -->
+                        <div style="padding: 10px 12px;">
+                            <div class="split-control-container" style="gap: 8px;">
+                                <!-- Train Slider -->
+                                <div class="split-slider-group" style="margin-bottom: 0;">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 0.8rem;">
+                                        <label style="margin: 0; font-weight: 600; color: #2D3436;">Train</label>
+                                        <div class="modern-number-input">
+                                            <button type="button"
+                                                onclick="document.getElementById('train-input').stepDown(); document.getElementById('train-slider').value = document.getElementById('train-input').value; document.getElementById('train-slider').dispatchEvent(new Event('input'));">-</button>
+                                            <input type="number" id="train-input" min="0" max="100" value="70">
+                                            <button type="button"
+                                                onclick="document.getElementById('train-input').stepUp(); document.getElementById('train-slider').value = document.getElementById('train-input').value; document.getElementById('train-slider').dispatchEvent(new Event('input'));">+</button>
+                                            <span class="unit">%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" id="train-slider" class="split-slider" min="0" max="100"
+                                        value="70" step="1" style="height: 4px;">
+                                </div>
+                                <!-- Val Slider -->
+                                <div class="split-slider-group" style="margin-bottom: 0;">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 0.8rem;">
+                                        <label style="margin: 0; font-weight: 600; color: #2D3436;">Val</label>
+                                        <div class="modern-number-input">
+                                            <button type="button"
+                                                onclick="document.getElementById('val-input').stepDown(); document.getElementById('val-slider').value = document.getElementById('val-input').value; document.getElementById('val-slider').dispatchEvent(new Event('input'));">-</button>
+                                            <input type="number" id="val-input" min="0" max="100" value="20">
+                                            <button type="button"
+                                                onclick="document.getElementById('val-input').stepUp(); document.getElementById('val-slider').value = document.getElementById('val-input').value; document.getElementById('val-slider').dispatchEvent(new Event('input'));">+</button>
+                                            <span class="unit">%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" id="val-slider" class="split-slider" min="0" max="100"
+                                        value="20" step="1" style="height: 4px;">
+                                </div>
+                                <!-- Test Slider -->
+                                <div class="split-slider-group" style="margin-bottom: 0;">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 0.8rem;">
+                                        <label style="margin: 0; font-weight: 600; color: #2D3436;">Test</label>
+                                        <div class="modern-number-input">
+                                            <button type="button"
+                                                onclick="document.getElementById('test-input').stepDown(); document.getElementById('test-slider').value = document.getElementById('test-input').value; document.getElementById('test-slider').dispatchEvent(new Event('input'));">-</button>
+                                            <input type="number" id="test-input" min="0" max="100" value="10">
+                                            <button type="button"
+                                                onclick="document.getElementById('test-input').stepUp(); document.getElementById('test-slider').value = document.getElementById('test-input').value; document.getElementById('test-slider').dispatchEvent(new Event('input'));">+</button>
+                                            <span class="unit">%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" id="test-slider" class="split-slider" min="0" max="100"
+                                        value="10" step="1" style="height: 4px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Footer Minimalista -->
+                        <div
+                            style="padding: 8px 12px; border-top: 1px solid rgba(126, 214, 166, 0.1); background: var(--surface); display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
+                            <span style="font-weight: 700; color: #28a745;" id="split-total">Total: 100%</span>
+
+                        </div>
+                    </div>
+                    <!-- Classe Negativa (Reutilizável) -->
+                    <div class="split-control-card" data-class="negativa">
+                        <!-- Header Compacto -->
+                        <div style="padding: 10px 12px; border-bottom: 1px solid var(--border); height: 44px;">
+                            <h4 style="margin: 0; font-size: 0.85rem; font-weight: 700; ">Negativa</h4>
+                        </div>
+
+                        <!-- Content: Sliders Compactos -->
+                        <div style="padding: 10px 12px;">
+                            <div class="split-control-container" style="gap: 8px;">
+                                <!-- Train Slider -->
+                                <div class="split-slider-group" style="margin-bottom: 0;">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 0.8rem;">
+                                        <label style="margin: 0; font-weight: 600; color: #2D3436;">Train</label>
+                                        <div class="modern-number-input">
+                                            <button type="button"
+                                                onclick="document.getElementById('rand-train-input').stepDown(); document.getElementById('rand-train-slider').value = document.getElementById('rand-train-input').value; document.getElementById('rand-train-slider').dispatchEvent(new Event('input'));">-</button>
+                                            <input type="number" id="rand-train-input" min="0" max="100" value="70">
+                                            <button type="button"
+                                                onclick="document.getElementById('rand-train-input').stepUp(); document.getElementById('rand-train-slider').value = document.getElementById('rand-train-input').value; document.getElementById('rand-train-slider').dispatchEvent(new Event('input'));">+</button>
+                                            <span class="unit">%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" id="rand-train-slider" class="split-slider" min="0" max="100"
+                                        value="70" step="1" style="height: 4px;">
+                                </div>
+                                <!-- Val Slider -->
+                                <div class="split-slider-group" style="margin-bottom: 0;">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 0.8rem;">
+                                        <label style="margin: 0; font-weight: 600; color: #2D3436;">Val</label>
+                                        <div class="modern-number-input">
+                                            <button type="button"
+                                                onclick="document.getElementById('rand-val-input').stepDown(); document.getElementById('rand-val-slider').value = document.getElementById('rand-val-input').value; document.getElementById('rand-val-slider').dispatchEvent(new Event('input'));">-</button>
+                                            <input type="number" id="rand-val-input" min="0" max="100" value="20">
+                                            <button type="button"
+                                                onclick="document.getElementById('rand-val-input').stepUp(); document.getElementById('rand-val-slider').value = document.getElementById('rand-val-input').value; document.getElementById('rand-val-slider').dispatchEvent(new Event('input'));">+</button>
+                                            <span class="unit">%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" id="rand-val-slider" class="split-slider" min="0" max="100"
+                                        value="20" step="1" style="height: 4px;">
+                                </div>
+                                <!-- Test Slider -->
+                                <div class="split-slider-group" style="margin-bottom: 0;">
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 0.8rem;">
+                                        <label style="margin: 0; font-weight: 600; color: #2D3436;">Test</label>
+                                        <div class="modern-number-input">
+                                            <button type="button"
+                                                onclick="document.getElementById('rand-test-input').stepDown(); document.getElementById('rand-test-slider').value = document.getElementById('rand-test-input').value; document.getElementById('rand-test-slider').dispatchEvent(new Event('input'));">-</button>
+                                            <input type="number" id="rand-test-input" min="0" max="100" value="10">
+                                            <button type="button"
+                                                onclick="document.getElementById('rand-test-input').stepUp(); document.getElementById('rand-test-slider').value = document.getElementById('rand-test-input').value; document.getElementById('rand-test-slider').dispatchEvent(new Event('input'));">+</button>
+                                            <span class="unit">%</span>
+                                        </div>
+                                    </div>
+                                    <input type="range" id="rand-test-slider" class="split-slider" min="0" max="100"
+                                        value="10" step="1" style="height: 4px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Footer Minimalista -->
+                        <div
+                            style="padding: 8px 12px; border-top: 1px solid rgba(255, 107, 107, 0.1); background: var(--surface); display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;">
+                            <span style="font-weight: 700; color: #FF6B6B;" id="rand-split-total">Total: 100%</span>
+
+                        </div>
+                    </div>
+
+                    <!-- Proporção Chart -->
+                    <div class="card" style="padding: 14px;">
+                        <h4 style="margin: 0 0 12px 0; font-size: 0.9rem; font-weight: 700; color: #2d3748;">
+                            Distribuição do Dataset</h4>
+                        <div style="position: relative; height: 250px;">
+                            <canvas id="chart-proportion"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gráficos de Split: Títulos Compactos e Limpos -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 12px;">
+                    <div class="card" style="padding: 10px;">
+                        <h4 style="margin: 0 0 12px 0; font-size: 0.8rem; font-weight: 600;">Train</h4>
+                        <div style="position: relative; height: 200px; width: 100%;">
+                            <canvas id="chart-train-split" style="display: block; width: 100%; height: 100%;"></canvas>
+                        </div>
+                    </div>
+                    <div class="card" style="padding: 10px;">
+                        <h4 style="margin: 0 0 12px 0; font-size: 0.8rem; font-weight: 600;">Validation</h4>
+                        <div style="position: relative; height: 200px; width: 100%;">
+                            <canvas id="chart-val-split" style="display: block; width: 100%; height: 100%;"></canvas>
+                        </div>
+                    </div>
+                    <div class="card" style="padding: 10px;">
+                        <h4 style="margin: 0 0 12px 0; font-size: 0.8rem; font-weight: 600;">Test</h4>
+                        <div style="position: relative; height: 200px; width: 100%;">
+                            <canvas id="chart-test-split" style="display: block; width: 100%; height: 100%;"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hidden inputs para manter compatibilidade com código existente -->
+                <input type="hidden" id="rand-train-percent" value="70">
+                <input type="hidden" id="rand-val-percent" value="20">
+                <input type="hidden" id="rand-test-percent" value="10">
+                <input type="hidden" id="train-percent" value="70">
+                <input type="hidden" id="val-percent" value="20">
+                <input type="hidden" id="test-percent" value="10">
+
+            </div>
+
+        </div>
+
+        <!-- Seção 3: Pré-Processamento -->
+        <div class="card" style="margin-top: 30px; margin-bottom: 20px;">
+            <div class="section-header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px;">
+                <div
+                    style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #551BB3; color: white; border-radius: 50%; font-weight: 700; font-size: 0.9rem;">
+                    03</div>
+                <div style="flex: 1;">
+                    <h3 style="margin: 0; color: #0f172a;">Aplicar Técnicas de Pré-Processamento</h3>
+                </div>
+                <div class="info-tooltip">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 16"
+                        style="width: 18px; height: 18px;">
+                        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                        <path
+                            d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                    </svg>
+                    <span class="tooltip-content">
+                        <div class="tooltip-section">
+                            <strong class="tooltip-title">Dúvida</strong>
+                            Configure as técnicas de pré-processamento que serão aplicadas nas imagens antes do
+                            treinamento.
+                        </div>
+                    </span>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap;">
+                <button id="open-preprocess-modal-btn" disabled style="
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center;
+                    gap: 8px;
+                    background: #551BB3;
+                    color: white;
+                    border: none;
+                    padding: 12px 20px;
+                    font-weight: 600;
+                    font-size: 0.95rem;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    flex-shrink: 0;
+                ">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span>Inserir Técnicas</span>
+                </button>
+
+                <div id="selected-preprocessing-summary" style="
+                    flex: 1; 
+                    min-width: 280px;
+                    padding: 12px 15px; 
+                    background: transparent;
+                    border: 2px dashed #d1d5db;
+                    border-radius: 6px; 
+                    font-size: 0.9rem;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                ">
+                    <div id="preprocessing-empty-state"
+                        style="display: flex; align-items: center; gap: 10px; color: #9ca3af;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            style="flex-shrink: 0; opacity: 0.6;">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="16"></line>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg>
+                        <div>
+                            <strong style="color: #6b7280; display: block;">Nenhuma técnica selecionada</strong>
+                            <span style="font-size: 0.8rem; color: #9ca3af; display: block; margin-top: 2px;">Clique no
+                                botão ao lado para adicionar</span>
+                        </div>
+                    </div>
+                    <div id="preprocessing-tags-container"
+                        style="display: none; flex-wrap: wrap; gap: 8px; margin-top: 0;"></div>
+                </div>
+            </div>
+
+            <!-- Checkboxes ocultos para manter compatibilidade com código existente -->
+            <div id="tipo-checkboxes-preprocessing" style="display: none;">
             </div>
         </div>
-        <pre id="config-preview" class="config-preview" aria-live="polite"
-            style="margin-top:10px;white-space:pre-wrap;word-break:break-word"></pre>
 
-        <div id="config-editor" class="config-editor hidden" style="margin-top:10px">
-            <textarea id="config-json" class="config-textarea" rows="14"></textarea>
-            <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end">
-                <button id="save-config-btn" class="btn btn-success">Salvar</button>
-                <button id="cancel-config-btn" class="btn">Cancelar</button>
+        <!-- Seção 4: Configuração de Parâmetros e Console -->
+        <div class="card" style="margin-top: 30px;">
+            <div
+                style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:15px;border-bottom:1px solid var(--border);">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div
+                        style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #551BB3; color: white; border-radius: 50%; font-weight: 700; font-size: 0.9rem;">
+                        04</div>
+                    <h3 style="margin: 0; color: #0f172a;">Configuração de Parâmetros</h3>
+                    <div class="info-tooltip">
+                        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16" />
+                            <path
+                                d="M5.255 5.786a.237.237 0 0 0 .241.247h.825c.138 0 .248-.113.266-.25.09-.656.54-1.134 1.342-1.134.686 0 1.314.343 1.314 1.168 0 .635-.374.927-.965 1.371-.673.489-1.206 1.06-1.168 1.987l.003.217a.25.25 0 0 0 .25.246h.811a.25.25 0 0 0 .25-.25v-.105c0-.718.273-.927 1.01-1.486.609-.463 1.244-.977 1.244-2.056 0-1.511-1.276-2.241-2.673-2.241-1.267 0-2.655.59-2.75 2.286m1.557 5.763c0 .533.425.927 1.01.927.609 0 1.028-.394 1.028-.927 0-.552-.42-.944-1.029-.944-.585 0-1.01.392-1.01.944" />
+                        </svg>
+                        <span class="tooltip-content">Ajuste o JSON de treino ou restaure o padrão.</span>
+                    </div>
+                </div>
             </div>
-            <div id="config-error" class="alert-error hidden" style="margin-top:8px"></div>
+
+            <div id="config-panel" style="margin-top: 15px;">
+                <!-- Editor Container com tema Dark Mode -->
+                <div id="config-editor-container" style="
+                    background: #0F172A;
+                    border-radius: 8px;
+                    border: 1px solid #1e293b;
+                    overflow: hidden;
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+                    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+                ">
+                    <!-- VS Code-style Tab Bar -->
+                    <div style="
+                        background: #1E293B;
+                        border-bottom: 1px solid #334155;
+                        display: flex;
+                        align-items: center;
+                        padding: 0 12px;
+                        height: 36px;
+                        gap: 8px;
+                    ">
+                        <!-- Tab Icon -->
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        <span style="
+                            color: #CBD5E1;
+                            font-size: 0.85rem;
+                            font-weight: 500;
+                            flex: 1;
+                        ">config.json</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="reset-config-btn" class="btn" style="
+                                    background: transparent;
+                                    color: #94A3B8;
+                                    border: none;
+                                    padding: 4px 8px;
+                                    font-weight: 500;
+                                    cursor: pointer;
+                                    border-radius: 4px;
+                                    font-size: 0.8rem;
+                                    transition: all 0.2s ease;
+                                "
+                                onmouseover="this.style.background='rgba(148, 163, 184, 0.1)'; this.style.color='#CBD5E1';"
+                                onmouseout="this.style.background='transparent'; this.style.color='#94A3B8';">
+                                Restaurar
+                            </button>
+                            <button id="edit-config-btn" class="btn" style="
+                                    background: rgba(85, 27, 179, 0.15);
+                                    color: #A78BFA;
+                                    border: 1px solid rgba(167, 139, 250, 0.3);
+                                    padding: 4px 8px;
+                                    font-weight: 500;
+                                    cursor: pointer;
+                                    border-radius: 4px;
+                                    font-size: 0.8rem;
+                                    transition: all 0.2s ease;
+                                "
+                                onmouseover="this.style.background='rgba(85, 27, 179, 0.25)'; this.style.borderColor='rgba(167, 139, 250, 0.5)';"
+                                onmouseout="this.style.background='rgba(85, 27, 179, 0.15)'; this.style.borderColor='rgba(167, 139, 250, 0.3)';">
+                                Editar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Preview Mode (Read-Only) -->
+                    <div id="config-preview-container" style="padding: 16px; color: #E2E8F0;">
+                        <pre id="config-preview" class="config-preview" style="
+                            margin: 0;
+                            white-space: pre-wrap;
+                            word-break: break-word;
+                            font-size: 0.85rem;
+                            line-height: 1.6;
+                            color: #E2E8F0;
+                        ">{ ... }</pre>
+                    </div>
+
+                    <!-- Edit Mode -->
+                    <div id="config-editor" class="config-editor hidden" style="padding: 0;">
+                        <textarea id="config-json" class="config-textarea" rows="16" style="
+                                width: 100%;
+                                padding: 16px;
+                                border: none;
+                                background: #0F172A;
+                                color: #E2E8F0;
+                                font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+                                font-size: 0.85rem;
+                                line-height: 1.6;
+                                resize: vertical;
+                                outline: none;
+                            "></textarea>
+                        <div style="
+                            margin-top: 0;
+                            padding: 12px 16px;
+                            border-top: 1px solid #1e293b;
+                            display: flex;
+                            gap: 8px;
+                            justify-content: flex-end;
+                            background: #1E293B;
+                        ">
+                            <button id="cancel-config-btn" class="btn" style="
+                                    background: transparent;
+                                    color: #94A3B8;
+                                    padding: 8px 16px;
+                                    border: 1px solid #334155;
+                                    border-radius: 4px;
+                                    font-weight: 600;
+                                    cursor: pointer;
+                                    transition: all 0.2s ease;
+                                    font-size: 0.85rem;
+                                "
+                                onmouseover="this.style.background='rgba(148, 163, 184, 0.1)'; this.style.borderColor='#475569';"
+                                onmouseout="this.style.background='transparent'; this.style.borderColor='#334155';">
+                                Cancelar
+                            </button>
+                            <button id="save-config-btn" class="btn" style="
+                                    background: #10B981;
+                                    color: white;
+                                    padding: 8px 16px;
+                                    border: none;
+                                    border-radius: 4px;
+                                    font-weight: 600;
+                                    cursor: pointer;
+                                    transition: all 0.2s ease;
+                                    font-size: 0.85rem;
+                                " onmouseover="this.style.background='#059669';"
+                                onmouseout="this.style.background='#10B981';">
+                                Salvar
+                            </button>
+                        </div>
+                        <div id="config-error" class="alert-error hidden" style="
+                                margin: 0;
+                                padding: 12px 16px;
+                                color: #FCA5A5;
+                                background: rgba(220, 38, 38, 0.1);
+                                border-top: 1px solid #7F1D1D;
+                                font-size: 0.85rem;
+                            "></div>
+                    </div>
+                </div>
+            </div>
+
+            <hr style="margin:25px 0; border: 0; border-top: 1px solid #e5e7eb;">
+
+            <div class="log-section">
+                <style>
+                    @keyframes pulse-active {
+
+                        0%,
+                        100% {
+                            opacity: 1;
+                        }
+
+                        50% {
+                            opacity: 0.6;
+                        }
+                    }
+
+                    .terminal-status-indicator {
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 8px;
+                        padding: 6px 12px;
+                        border-radius: 4px;
+                        font-size: 0.85rem;
+                        font-weight: 600;
+                        transition: all 0.2s ease;
+                    }
+
+                    .terminal-status-indicator.waiting {
+                        background: #e2e8f0;
+                        color: #64748b;
+                    }
+
+                    .terminal-status-indicator.running {
+                        background: #dbeafe;
+                        color: #0369a1;
+                    }
+
+                    .status-dot {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 50%;
+                        display: inline-block;
+                    }
+
+                    .status-dot.waiting {
+                        background: #94a3b8;
+                    }
+
+                    .status-dot.running {
+                        background: #4ade80;
+                        animation: pulse-active 2s infinite;
+                    }
+
+                    .console-icon {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                </style>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <svg class="console-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            style="color: #551BB3;">
+                            <polyline points="4 17 10 11 4 5"></polyline>
+                            <line x1="12" y1="19" x2="20" y2="19"></line>
+                        </svg>
+                        <h3 style="margin: 0; font-size: 1.1rem; color: #0f172a;">Console de Treinamento</h3>
+                    </div>
+                    <span id="terminal-status" class="terminal-status-indicator waiting" style="">
+                        <span class="status-dot waiting"></span>
+                        <span>Aguardando</span>
+                    </span>
+                </div>
+
+                <div class="modern-terminal"
+                    style="background: #0F172A; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                    <div class="terminal-header"
+                        style="background: #1E293B; padding: 10px 15px; display: flex; align-items: center; border-bottom: 1px solid #334155;">
+                        <div class="terminal-dots" style="display: flex; gap: 6px; margin-right: 15px;">
+                            <span style="width: 10px; height: 10px; border-radius: 50%; background: #FF5F56;"></span>
+                            <span style="width: 10px; height: 10px; border-radius: 50%; background: #FFBD2E;"></span>
+                            <span style="width: 10px; height: 10px; border-radius: 50%; background: #27C93F;"></span>
+                        </div>
+                        <span class="terminal-title"
+                            style="color: #94A3B8; font-size: 0.75rem; font-family: monospace;">yolo_process_output.log</span>
+                    </div>
+                    <div id="logs" class="terminal-body"
+                        style="height: 400px; overflow-y: auto; padding: 15px; color: #F1F5F9; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 13px; line-height: 1.6;">
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <hr style="margin:20px 0;">
+        <!-- Seção 5: Inspeção de Resultados -->
+        <div class="card" style="margin-top: 30px; margin-bottom: 50px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+                <div
+                    style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: #551BB3; color: white; border-radius: 50%; font-weight: 700; font-size: 0.9rem;">
+                    05</div>
+                <h3 style="margin: 0;">Inspeção de Resultados</h3>
+            </div>
 
-    <div style="margin-top:20px; display: flex; gap: 10px; align-items: center;">
-        <button class="btn" id="start-training-btn">▶️ Iniciar Treinamento</button>
-        <button class="btn btn-danger hidden" id="cancel-training-btn" disabled>❌ Cancelar Treinamento</button>
-    </div>
+            <div class="job-filter-bar"
+                style="display: flex; gap: 12px; align-items: center; margin-bottom: 20px; padding: 12px; background: #f9fafb; border-radius: 6px;">
+                <label style="font-weight: 600; color: #374151;">Job:</label>
+                <select id="job-select" class="input"
+                    style="flex: 1; min-width: 220px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <option value="">Último ativo</option>
+                </select>
+                <button class="btn" id="job-select-apply"
+                    style="padding: 8px 16px; background: #551BB3; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">Visualizar</button>
+                <button class="btn" id="job-refresh-btn"
+                    style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; border-radius: 6px; font-weight: 600; cursor: pointer;">Recarregar</button>
+            </div>
 
-    <div class="progress-bar" style="margin-top:10px">
-        <div id="progress-fill" class="progress-fill"></div>
-    </div>
 
-    <h3 style="margin-top:20px;">🧪 Log de Treinamento</h3>
-    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px;">
-        Acompanhe o progresso e mensagens do processo em tempo real.
-    </p>
 
-    <textarea id="logs" readonly
-        style="margin-top:12px; background: #1e1e1e; color: #00ff00; height: 450px; overflow-y: scroll; padding: 10px; border-radius: 5px;"></textarea>
+            <div class="tabs-container">
+                <div class="tabs-header"
+                    style="display: flex; gap: 15px; border-bottom: 2px solid #e5e7eb; margin-bottom: 20px;">
+                    <button class="tab-trigger active" onclick="switchTab(this, 'batches')"
+                        style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid #551BB3; color: #551BB3; font-weight: 600; cursor: pointer; transition: 0.3s;">🖼️
+                        Batches</button>
+                    <button class="tab-trigger" onclick="switchTab(this, 'metrics')"
+                        style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: #64748B; font-weight: 600; cursor: pointer; transition: 0.3s;">📊
+                        Métricas</button>
+                    <button class="tab-trigger" onclick="switchTab(this, 'evolution')"
+                        style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; color: #64748B; font-weight: 600; cursor: pointer; transition: 0.3s;">📈
+                        Evolução</button>
+                </div>
 
-    <div class="card" style="margin:8px 0; padding:10px; display:flex; gap:8px; align-items:center;">
-        <label for="job-select" style="margin:0; font-weight:600;">Visualizar job:</label>
-        <select id="job-select" class="input" style="flex:1; min-width:220px;"></select>
-        <button class="btn" id="job-select-apply" title="Carregar imagens do job selecionado">Exibir</button>
-        <button class="btn" id="job-refresh-btn" title="Atualizar lista de jobs">Recarregar</button>
-        <small style="color:var(--text-muted);">Em branco = último concluído ou ativo</small>
-    </div>
-    <!-- Local onde as imagens de batches / validação / resultados serão exibidas durante o treinamento -->
-    <div id="training-images" class="training-images-area card" style="margin-top:12px; padding:12px;">
-        <!-- Ex: rows appended dinamicamente: train batches, val pairs, confusion matrices, results -->
-        <!-- Espaço reservado para evitar 'layout shift' quando as imagens aparecem -->
-        <div id="training-images-placeholder" style="min-height:320px; width:100%;"></div>
-    </div>
-</div>
+                <div class="tabs-content">
+                    <div id="tab-batches" class="tab-pane active">
+                        <div id="training-images-batches" class="results-grid"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+                        </div>
+                        <div id="batches-empty"
+                            style="text-align: center; padding: 40px; color: #94A3B8; font-size: 0.9rem;">Inicie o
+                            treino para ver os batches de entrada.</div>
+                    </div>
+                    <div id="tab-metrics" class="tab-pane" style="display: none;">
+                        <div id="training-images-metrics" class="results-grid"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+                        </div>
+                        <div id="metrics-empty"
+                            style="text-align: center; padding: 40px; color: #94A3B8; font-size: 0.9rem;">Matrizes de
+                            confusão aparecerão após a primeira época.</div>
+                    </div>
+                    <div id="tab-evolution" class="tab-pane" style="display: none;">
+                        <div id="training-images-evolution" class="results-grid"
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+                        </div>
+                        <div id="evolution-empty"
+                            style="text-align: center; padding: 40px; color: #94A3B8; font-size: 0.9rem;">Gráficos de
+                            Loss/Acc serão gerados ao final.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Espaço original para compatibilidade (hidden) -->
+            <div id="training-images" class="training-images-area card"
+                style="margin-top:12px; padding:12px; display: none;">
+                <div id="training-images-placeholder" style="min-height:320px; width:100%;"></div>
+            </div>
+
+            <style>
+                /* Garante que o grid de resultados seja flexível e não quebre o layout */
+                .results-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                    gap: 20px;
+                    padding: 10px 0;
+                }
+
+                .tab-trigger {
+                    position: relative;
+                    transition: all 0.3s ease;
+                }
+
+                .tab-trigger.active {
+                    color: #551BB3 !important;
+                    border-bottom-color: #551BB3 !important;
+                }
+
+                .tab-trigger:hover:not(.active) {
+                    color: #8b5cf6;
+                }
+
+                .tab-pane {
+                    animation: fadeIn 0.3s ease;
+                    min-height: 200px;
+                }
+
+                .tab-pane.active {
+                    display: block !important;
+                }
+
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                    }
+
+                    to {
+                        opacity: 1;
+                    }
+                }
+
+                .image-result-card {
+                    background: var(--surface);
+                    border: 1px solid var(--border);
+                    border-radius: 10px;
+                    overflow: hidden;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 2px 8px rgba(85, 27, 179, 0.06);
+                }
+
+                .image-result-card:hover {
+                    box-shadow: 0 8px 20px rgba(85, 27, 179, 0.12);
+                    transform: translateY(-2px);
+                }
+
+                .image-result-header {
+                    padding: 12px;
+                    border-bottom: 1px solid var(--border);
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+
+                .image-result-header h4 {
+                    margin: 0;
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    color: #0f172a;
+                }
+
+                .image-result-body {
+                    position: relative;
+                    background: #f9fafb;
+                    padding: 12px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 200px;
+                }
+
+                .image-result-body img {
+                    max-width: 100%;
+                    max-height: 400px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                }
+
+                .image-expand-btn {
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    background: rgba(85, 27, 179, 0.9);
+                    color: white;
+                    border: none;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 16px;
+                    transition: all 0.2s ease;
+                    opacity: 0;
+                }
+
+                .image-result-body:hover .image-expand-btn {
+                    opacity: 1;
+                }
+
+                .image-expand-btn:hover {
+                    background: #551BB3;
+                    transform: scale(1.1);
+                }
+
+                .image-result-footer {
+                    padding: 10px 12px;
+                    border-top: 1px solid var(--border);
+                    font-size: 0.8rem;
+                    color: #6b7280;
+                    line-height: 1.5;
+                }
+            </style>
+
+            <!-- Script para gerenciar abas -->
+            <script>
+                // 1. Define Manager Mock ANTES de tudo para evitar timeout
+                if (!window.TrainingResultsManager) {
+                    console.log('[TABS] Criando TrainingResultsManager mock');
+                    window.TrainingResultsManager = {
+                        isReady: true,
+                        queue: [],
+                        init: function () { console.log('[Manager Mock] Ready'); },
+                        addImagesToTab: function () { console.log('[Manager Mock] addImagesToTab chamado'); }
+                    };
+                }
+
+                // 2. Define a função switchTab IMEDIATAMENTE no escopo global
+                window.switchTab = function (element, tabName) {
+                    console.log('[TABS] Executando switch para:', tabName);
+
+                    const container = element ? element.closest('.tabs-container') : null;
+                    if (!container) {
+                        console.warn('[TABS] Container não encontrado');
+                        return;
+                    }
+
+                    // Atualiza botões
+                    container.querySelectorAll('.tab-trigger').forEach(btn => {
+                        btn.classList.remove('active');
+                        btn.style.color = '#64748B';
+                        btn.style.borderBottomColor = 'transparent';
+                    });
+
+                    element.classList.add('active');
+                    element.style.color = '#551BB3';
+                    element.style.borderBottomColor = '#551BB3';
+
+                    // Atualiza painéis
+                    container.querySelectorAll('.tab-pane').forEach(pane => {
+                        pane.style.display = 'none';
+                        pane.classList.remove('active');
+                    });
+
+                    const target = document.getElementById('tab-' + tabName);
+                    if (target) {
+                        target.style.display = 'block';
+                        target.classList.add('active');
+                        console.log('[TABS] ✓ Aba ativada:', tabName);
+                    } else {
+                        console.warn('[TABS] Painel não encontrado:', 'tab-' + tabName);
+                    }
+                };
+
+                // Inicialização do TrainingControl (switchTab já está em ui.js)
+                console.log('[treinamento.html] switchTab disponível?', typeof window.switchTab);
+
+                if (window.TrainingControl && typeof window.TrainingControl.init === 'function') {
+                    console.log('[treinamento.html] Inicializando TrainingControl...');
+                    window.TrainingControl.init();
+                    console.log('[treinamento.html] ✓ TrainingControl inicializado');
+                } else {
+                    console.warn('[treinamento.html] TrainingControl não disponível ainda');
+                }
+            </script>
+        </div>

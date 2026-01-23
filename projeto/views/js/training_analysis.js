@@ -31,7 +31,7 @@
                 if (!options?.enabled) return;
                 const { ctx } = chart;
                 ctx.save();
-                ctx.font = options.font || '10px Inter, sans-serif';
+                ctx.font = options.font || '10px Poppins, sans-serif';
                 ctx.fillStyle = options.color || '#475569';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
@@ -1547,7 +1547,7 @@
                         labels: {
                             boxWidth: 8,
                             usePointStyle: true,
-                            font: { size: 12, family: 'Inter' }
+                            font: { size: 12, family: 'Poppins' }
                         }
                     },
                     tooltip: {

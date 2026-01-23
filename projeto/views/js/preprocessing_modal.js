@@ -54,6 +54,9 @@
 
             // Carrega técnicas disponíveis
             this.loadAvailableTechniques();
+
+            // Inicializa o display das tags na visualização principal
+            this.updatePreprocessingTagsDisplay();
         },
 
         setDataset(name) {
@@ -385,6 +388,9 @@
             localStorage.setItem('preprocessing_training_pipeline', JSON.stringify(pipeline));
             console.log('[PreprocessingModal] Pipeline salvo no localStorage:', pipeline);
 
+            // Atualiza a visualização das tags selecionadas
+            this.updatePreprocessingTagsDisplay();
+
             // Fecha modal
             this.close();
 
@@ -412,6 +418,86 @@
             } else {
                 summaryEl.textContent = this.selectedTechniques.join(', ');
                 summaryEl.style.color = '#2ecc71';
+            }
+        },
+
+        updatePreprocessingTagsDisplay() {
+            const tagsContainer = document.getElementById('preprocessing-tags-container');
+            const emptyState = document.getElementById('preprocessing-empty-state');
+            if (!tagsContainer || !emptyState) return;
+
+            // Limpa container de tags
+            tagsContainer.innerHTML = '';
+
+            if (this.selectedTechniques.length === 0) {
+                // Mostra empty state
+                emptyState.style.display = 'flex';
+                tagsContainer.style.display = 'none';
+            } else {
+                // Esconde empty state e mostra tags
+                emptyState.style.display = 'none';
+                tagsContainer.style.display = 'flex';
+
+                // Cria tags para cada técnica selecionada
+                this.selectedTechniques.forEach((technique, index) => {
+                    const tag = document.createElement('div');
+                    tag.className = 'preprocessing-tag';
+                    tag.style.cssText = `
+                        display: inline-flex;
+                        align-items: center;
+                        gap: 6px;
+                        padding: 6px 10px;
+                        background: rgba(85, 27, 179, 0.1);
+                        border: 1px solid rgba(85, 27, 179, 0.3);
+                        border-radius: 12px;
+                        font-size: 0.85rem;
+                        color: #551BB3;
+                        font-weight: 500;
+                    `;
+
+                    // Texto da técnica
+                    const textSpan = document.createElement('span');
+                    textSpan.textContent = technique;
+                    tag.appendChild(textSpan);
+
+                    // Botão de remover
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.style.cssText = `
+                        background: none;
+                        border: none;
+                        color: inherit;
+                        cursor: pointer;
+                        padding: 0;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 16px;
+                        height: 16px;
+                        border-radius: 50%;
+                        transition: background 0.2s;
+                    `;
+                    removeBtn.innerHTML = '×';
+                    removeBtn.title = 'Remover técnica';
+                    removeBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Remove técnica e seus parâmetros
+                        this.selectedTechniques.splice(index, 1);
+                        this.selectedTechniqueParams.splice(index, 1);
+                        // Atualiza display
+                        this.updatePreprocessingTagsDisplay();
+                    });
+                    removeBtn.addEventListener('mouseover', () => {
+                        removeBtn.style.background = 'rgba(85, 27, 179, 0.2)';
+                    });
+                    removeBtn.addEventListener('mouseout', () => {
+                        removeBtn.style.background = 'none';
+                    });
+
+                    tag.appendChild(removeBtn);
+                    tagsContainer.appendChild(tag);
+                });
             }
         },
 

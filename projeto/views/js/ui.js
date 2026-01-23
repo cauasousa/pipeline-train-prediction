@@ -120,6 +120,42 @@
 
     // --- FUNÇÕES DE DADOS NEGATIVOS/RESUMO (TREINAMENTO) ---
 
+    // Pequeno helper para inputs numéricos com update visual
+    function stepNumericInput(btn, delta) {
+        const input = btn?.parentNode?.querySelector('input[type="number"]');
+        if (!input) return;
+        if (delta > 0) input.stepUp(); else input.stepDown();
+        input.dispatchEvent(new Event('input'));
+    }
+
+    // Atualiza o texto "valor / max" nos cards de linha
+    function updateLineCountDisplay(input) {
+        if (!input) return;
+        const max = Number(input.getAttribute('max') || 0);
+        const val = Number(input.value || 0);
+        const indicator = input.closest('.line-item')?.querySelector('.line-max');
+        if (indicator) indicator.textContent = `${val} / ${max}`;
+    }
+
+    // Obtém o modo ativo (random/select) respeitando o estado armazenado e o botão ativo
+    function getDetailMode(detailRow) {
+        if (!detailRow) return 'random';
+        const activeBtn = detailRow.querySelector('.mode-options-group .segment.active');
+        if (activeBtn && activeBtn.dataset.mode) return activeBtn.dataset.mode;
+        return detailRow.dataset.mode || 'random';
+    }
+
+    // Sincroniza os botões de modo com o estado atual
+    function setModeButtonsState(detailRow, mode) {
+        if (!detailRow) return;
+        detailRow.dataset.mode = mode;
+        detailRow.querySelectorAll('.mode-options-group .segment').forEach(btn => {
+            const isActive = (btn.dataset.mode === mode);
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-pressed', isActive);
+        });
+    }
+
     // Função global para alternar a visibilidade das linhas (chamada pelo HTML)
     global.toggleLineSelection = function (button, type) {
         const detailRow = document.querySelector(`.line-detail-row[data-parent="${type}"]`);
@@ -132,8 +168,8 @@
 
             // Respeita o modo selecionado no painel (random/select). Se for 'select', preenchemos a grid;
             // se for 'random', mantemos a grid oculta e mostramos apenas o painel de quantidade automática.
-            const selectedModeEl = detailRow.querySelector('.mode-options-group input[type="radio"]:checked');
-            const selectedMode = selectedModeEl ? selectedModeEl.value : 'random';
+            const selectedMode = getDetailMode(detailRow);
+            setModeButtonsState(detailRow, selectedMode);
 
             if (selectedMode === 'select') {
                 if (container) {
@@ -149,20 +185,34 @@
                         const maxAvailable = linesForType[lineName];
                         const item = document.createElement('div');
                         item.className = 'line-item';
-                        const lineEnabledChecked = typeChecked ? 'checked' : '';
-                        const lineValue = typeChecked ? defaultCount : 0;
+                        // NÃO auto-seleciona as checkboxes - deixa desmarcadas por padrão
+                        const lineEnabledChecked = '';
+                        const lineValue = 0;
                         item.innerHTML = `
-                            <label style="display:block; font-weight:600">${lineName} <span style='font-weight:400; color:var(--text-muted); font-size:12px'>(até ${maxAvailable})</span></label>
-                            <div style="display:flex;gap:8px;align-items:center">
-                                <input type="checkbox" class="line-enabled" data-line="${lineName}" data-type="${type}" ${lineEnabledChecked} />
-                                <input type="number" data-line="${lineName}" data-type="${type}" class="input input-small line-count" value="${lineValue}" min="0" max="${maxAvailable}">
+                            <header>
+                                <span>${lineName}</span>
+                                <span class="line-max">${lineValue} / ${maxAvailable}</span>
+                            </header>
+                            <div style="display:flex;gap:8px;align-items:center; justify-content:space-between;">
+                                <input type="checkbox" class="line-enabled custom-checkbox" data-line="${lineName}" data-type="${type}" ${lineEnabledChecked} />
+                                <div class="modern-number-input" style="margin: 0;">
+                                    <button type="button" onclick="window.UI.stepNumericInput(this, -1)">-</button>
+                                    <input type="number" data-line="${lineName}" data-type="${type}" class="line-count" value="${lineValue}" min="0" max="${maxAvailable}" style="width: 54px;">
+                                    <button type="button" onclick="window.UI.stepNumericInput(this, 1)">+</button>
+                                </div>
                             </div>
                         `;
                         container.appendChild(item);
                     }
 
                     // Reconecta eventos para os novos inputs
-                    container.querySelectorAll('.line-count').forEach(inp => inp.addEventListener('input', updateNegativeSummary));
+                    container.querySelectorAll('.line-count').forEach(inp => {
+                        inp.addEventListener('input', (e) => {
+                            updateLineCountDisplay(e.target);
+                            updateNegativeSummary();
+                        });
+                        updateLineCountDisplay(inp);
+                    });
                     container.querySelectorAll('.line-enabled').forEach(cb => cb.addEventListener('change', updateNegativeSummary));
 
                     // mostra a grid e esconde o painel random
@@ -185,7 +235,8 @@
         }
 
         detailRow.classList.toggle('hidden');
-        button.textContent = detailRow.classList.contains('hidden') ? '⚙️ Detalhes' : 'Ocultar';
+        button.classList.toggle('open', !detailRow.classList.contains('hidden'));
+        button.setAttribute('aria-expanded', (!detailRow.classList.contains('hidden')).toString());
         updateNegativeSummary();
     };
 
@@ -207,7 +258,7 @@
             const availableLines = Object.keys(currentLineCounts[type] || {}).length;
 
             // Determine selected mode for this type: 'random' or 'select'
-            const selectedMode = detailRow ? (detailRow.querySelector('.mode-options-group input[type="radio"]:checked')?.value || 'random') : 'random';
+            const selectedMode = detailRow ? getDetailMode(detailRow) : 'random';
             if (typeCheckbox && typeCheckbox.checked) {
                 if (selectedMode === 'select' && detailRow && detailRow.querySelector('.line-item')) {
                     // 1) Se há seleção granular (itens .line-item), soma os valores explicitamente
@@ -249,12 +300,23 @@
 
             // Se não está marcado, mostramos quantas linhas existem disponíveis
             if (!typeCheckbox || !typeCheckbox.checked) {
-                if (linesCountCell) linesCountCell.innerHTML = `<span class="badge">${availableLines} Linhas</span>`;
-                if (totalCountCell) totalCountCell.textContent = `0`;
+                if (linesCountCell) linesCountCell.innerHTML = `<span class="badge lines-badge">${availableLines} Linhas</span>`;
+                if (totalCountCell) totalCountCell.innerHTML = `<span class="badge images-badge empty">0</span>`;
+                // Remove classe selected da linha
+                typeRow.classList.remove('selected');
+                const svg = typeRow.querySelector('svg');
+                if (svg) svg.setAttribute('stroke', '#94a3b8');
             } else {
                 const modeLabel = selectedMode === 'select' ? 'Selecionar Linhas' : 'Implantes Aleatórios';
-                if (linesCountCell) linesCountCell.innerHTML = `<span class="badge">${linesCount} Linhas (${modeLabel})</span>`;
-                if (totalCountCell) totalCountCell.innerHTML = `<span class="badge">${typeTotal}</span>`;
+                if (linesCountCell) linesCountCell.innerHTML = `<span class="badge lines-badge">${linesCount} Linhas</span>`;
+                if (totalCountCell) {
+                    const badgeClass = typeTotal > 0 ? 'images-badge' : 'images-badge empty';
+                    totalCountCell.innerHTML = `<span class="badge ${badgeClass}">${typeTotal}</span>`;
+                }
+                // Adiciona classe selected na linha
+                typeRow.classList.add('selected');
+                const svg = typeRow.querySelector('svg');
+                if (svg) svg.setAttribute('stroke', '#28a745');
             }
 
             totalNegatives += typeTotal;
@@ -267,22 +329,17 @@
         if (document.getElementById('total-negative-count')) document.getElementById('total-negative-count').textContent = totalNegatives;
         if (document.getElementById('total-all')) document.getElementById('total-all').textContent = totalAll;
 
-        // Verifica desbalanceamento e mostra alerta
-        const alertEl = document.getElementById('dataset-balance-alert');
-        if (alertEl && totalAll > 0) {
-            const negativePercent = (totalNegatives / totalAll) * 100;
-            const positivePercent = (totalPositives / totalAll) * 100;
+        // Atualiza barra sutil de equilíbrio no badge
+        const ratio = totalPositives > 0 ? (totalNegatives / totalPositives) : 0;
+        const width = Math.min(100, (ratio / (ratio + 1)) * 100);
+        let balanceColor = '#22c55e'; // verde OK
+        if (ratio > 50) balanceColor = '#ef4444'; // crítico
+        else if (ratio > 10) balanceColor = '#f59e0b'; // aviso
+        document.documentElement.style.setProperty('--balance-ratio', `${width.toFixed(1)}%`);
+        document.documentElement.style.setProperty('--balance-color', balanceColor);
+        document.documentElement.style.setProperty('--balance-bar-opacity', ratio > 0 ? '1' : '0');
 
-            if (negativePercent < 5 || positivePercent < 5) {
-                alertEl.className = 'alert-warning';
-                alertEl.style.display = 'block';
-                const minClass = negativePercent < positivePercent ? 'negativa' : 'positiva';
-                const minPercent = Math.min(negativePercent, positivePercent).toFixed(1);
-                alertEl.innerHTML = `⚠ Dataset altamente desbalanceado — classe ${minClass} &lt; ${minPercent}%`;
-            } else {
-                alertEl.style.display = 'none';
-            }
-        }
+
 
         // Recalcula os splits separadamente para positivos e negativos e depois soma para o split total
         const posTrainPct = Number(document.getElementById('train-percent')?.value || 0);
@@ -348,14 +405,33 @@
         stacked: null
     };
 
-    function updateDatasetGraphs(data) {
+    // Função para destruir todos os gráficos Chart.js
+    function destroyAllCharts() {
+        // Destrói os gráficos de split (train, val, test)
+        ['chart-train-split', 'chart-val-split', 'chart-test-split'].forEach(chartId => {
+            if (chartsInstances[chartId]) {
+                chartsInstances[chartId].destroy();
+                chartsInstances[chartId] = null;
+            }
+        });
+
+        // Destrói o gráfico de proporção
+        if (chartsInstances.proportion) {
+            chartsInstances.proportion.destroy();
+            chartsInstances.proportion = null;
+        }
+
+        console.log('[destroyAllCharts] Todos os gráficos foram destruídos');
+    }
+
+    function updateDatasetGraphs(data, options = {}) {
         // Se Chart.js não está disponível, retorna sem erro
         if (!window.Chart) {
             console.warn('Chart.js não foi carregado ainda');
             return;
         }
 
-        console.log('[updateDatasetGraphs] Data recebida:', data);
+        console.log('[updateDatasetGraphs] Data recebida:', data, 'options:', options);
 
         const {
             posTotal, negTotal, totalAll,
@@ -363,6 +439,17 @@
             negTrain, negVal, negTest,
             totalTrain, totalVal, totalTest
         } = data;
+
+        // Atualiza badges dos headers dos cards
+        const posCountBadge = document.getElementById('pos-count-badge');
+        const randCountBadge = document.getElementById('rand-count-badge');
+
+        if (posCountBadge) {
+            posCountBadge.textContent = posTotal;
+        }
+        if (randCountBadge) {
+            randCountBadge.textContent = negTotal;
+        }
 
         // Atualiza KPI cards
         const kpiTotal = document.getElementById('kpi-total');
@@ -386,79 +473,228 @@
 
         // Obtém contextos dos canvas
         const canvasProportion = document.getElementById('chart-proportion');
-        const canvasStacked = document.getElementById('chart-stacked-bars');
 
-        console.log('[updateDatasetGraphs] Canvas Elements:', { canvasProportion, canvasStacked });
+        console.log('[updateDatasetGraphs] Canvas Elements:', { canvasProportion });
 
-        if (!canvasProportion || !canvasStacked) {
-            console.warn('[updateDatasetGraphs] Um ou mais canvas elements não foram encontrados!');
+        if (!options.skipProportion && !canvasProportion) {
+            console.warn('[updateDatasetGraphs] Canvas element chart-proportion não foi encontrado!');
             return;
         }
 
-        // --- Gráfico 1: Donut (Positivo vs Negativo) ---
-        if (chartsInstances.proportion) chartsInstances.proportion.destroy();
-        chartsInstances.proportion = new Chart(canvasProportion, {
-            type: 'doughnut',
-            data: {
-                labels: ['Positivas', 'Negativas'],
-                datasets: [{
-                    data: [posTotal, negTotal],
-                    backgroundColor: ['#28a745', '#dc3545'],
-                    borderColor: ['#1e7e34', '#bd2130'],
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { padding: 15, font: { size: 12 } }
-                    }
-                }
-            }
-        });
+        // --- Gráfico 1: Donut (Positivo vs Negativo) --- (pula se skipProportion=true)
+        if (!options.skipProportion && canvasProportion) {
+            // Plugin para desenhar valores e percentuais dentro das fatias
+            const proportionLabelsPlugin = {
+                id: 'proportionLabels',
+                afterDatasetsDraw(chart) {
+                    const { ctx } = chart;
+                    const dataset = chart.data.datasets[0];
+                    const meta = chart.getDatasetMeta(0);
+                    const total = (dataset.data || []).reduce((a, b) => a + b, 0);
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
 
-        // --- Gráfico 2: Barras Empilhadas (Train/Val/Test com Pos+Neg empilhados) ---
-        if (chartsInstances.stacked) chartsInstances.stacked.destroy();
-        chartsInstances.stacked = new Chart(canvasStacked, {
-            type: 'bar',
-            data: {
-                labels: ['Train', 'Val', 'Test'],
-                datasets: [
-                    {
-                        label: 'Positivas',
-                        data: [posTrain, posVal, posTest],
-                        backgroundColor: '#28a745',
-                        borderColor: '#1e7e34',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Negativas',
-                        data: [negTrain, negVal, negTest],
-                        backgroundColor: '#dc3545',
-                        borderColor: '#bd2130',
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                indexAxis: 'x',
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: { stacked: true },
-                    y: { stacked: true }
+                    meta.data.forEach((arc, i) => {
+                        const val = Number(dataset.data[i] || 0);
+                        if (!Number.isFinite(val) || val <= 0) return;
+                        const pct = total ? ((val / total) * 100).toFixed(1) : 0;
+                        const angle = (arc.startAngle + arc.endAngle) / 2;
+                        const rCenter = (arc.innerRadius + arc.outerRadius) / 2;
+                        const x = arc.x + Math.cos(angle) * rCenter;
+                        const y = arc.y + Math.sin(angle) * rCenter;
+
+                        // Texto branco com sombra para contraste
+                        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                        ctx.shadowBlur = 4;
+                        ctx.shadowOffsetX = 0;
+                        ctx.shadowOffsetY = 1;
+                        ctx.fillStyle = '#ffffff';
+
+                        // Percentual centralizado
+                        ctx.font = '700 16px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+                        ctx.fillText(`${pct}%`, x, y);
+                    });
+                    ctx.restore();
+                }
+            };
+
+            if (chartsInstances.proportion) chartsInstances.proportion.destroy();
+            chartsInstances.proportion = new Chart(canvasProportion, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Positivas', 'Negativas'],
+                    datasets: [{
+                        data: [posTotal, negTotal],
+                        backgroundColor: ['#28a745', '#dc3545'],
+                        borderColor: ['#1e7e34', '#bd2130'],
+                        borderWidth: 2
+                    }]
                 },
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: { padding: 15, font: { size: 12 } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '55%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 18,
+                                font: { size: 13, weight: '600' },
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                generateLabels: function (chart) {
+                                    const data = chart.data;
+                                    const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                    return data.labels.map((label, i) => {
+                                        const value = data.datasets[0].data[i];
+                                        const percentage = total ? ((value / total) * 100).toFixed(1) : 0;
+                                        return {
+                                            text: `${label}: ${value} (${percentage}%)`,
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            strokeStyle: data.datasets[0].borderColor[i],
+                                            lineWidth: 2,
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                            }
+                        },
+                        tooltip: {
+                            enabled: true,
+                            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                            padding: 12,
+                            titleFont: { size: 14, weight: '700' },
+                            bodyFont: { size: 13 },
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            callbacks: {
+                                title: function (context) {
+                                    return context[0].label;
+                                },
+                                label: function (context) {
+                                    const value = context.parsed;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total ? ((value / total) * 100).toFixed(2) : 0;
+                                    return [
+                                        `Quantidade: ${value} imagens`,
+                                        `Percentual: ${percentage}%`,
+                                        `Total: ${total} imagens`
+                                    ];
+                                }
+                            }
+                        }
+                    }
+                },
+                plugins: [proportionLabelsPlugin]
+            });
+        }
+
+        // --- Gráficos 2, 3, 4: Barras Horizontais (Train/Val/Test com Pos vs Neg) ---
+        const COLORS = {
+            positive: '#551BB3',
+            negative: '#B31BA8'
+        };
+
+        // Função reutilizável para criar gráficos de barras horizontais
+        function createHorizontalBarChart(canvasId, title, positive, negative) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            // Se o gráfico já existe, apenas atualiza os dados ao invés de destruir e recriar
+            if (chartsInstances[canvasId]) {
+                chartsInstances[canvasId].data.datasets[0].data = [positive, negative];
+                chartsInstances[canvasId].update('active');
+                return;
+            }
+
+            chartsInstances[canvasId] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Positivo', 'Negativo'],
+                    datasets: [{
+                        label: title,
+                        data: [positive, negative],
+                        backgroundColor: [COLORS.positive, COLORS.negative],
+                        borderColor: [COLORS.positive, COLORS.negative],
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barThickness: 35,
+                        categoryPercentage: 0.35,
+                        barPercentage: 0.85
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 300,
+                        easing: 'easeInOutQuad'
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: title,
+                            align: 'start',
+                            font: { size: 13, weight: '600', family: 'Poppins, sans-serif' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { drawBorder: false },
+                            ticks: { precision: 0, font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { font: { size: 11 } }
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
+
+        // Renderiza os 3 gráficos
+        createHorizontalBarChart('chart-train-split', 'Train', posTrain, negTrain);
+        createHorizontalBarChart('chart-val-split', 'Validation', posVal, negVal);
+        createHorizontalBarChart('chart-test-split', 'Test', posTest, negTest);
+    }
+
+    // Atualiza apenas a distribuição (barras) baseada nos sliders, mantendo a proporção intacta
+    function updateSplitDistribution() {
+        const posTotal = Number(document.getElementById('total-positive-count')?.textContent || 0);
+        const negTotal = Number(document.getElementById('total-negative-count')?.textContent || 0);
+        const totalAll = posTotal + negTotal;
+
+        const posTrainPct = Number(document.getElementById('train-percent')?.value || 0);
+        const posValPct = Number(document.getElementById('val-percent')?.value || 0);
+        const posTestPct = Number(document.getElementById('test-percent')?.value || 0);
+
+        const negTrainPct = Number(document.getElementById('rand-train-percent')?.value || 0);
+        const negValPct = Number(document.getElementById('rand-val-percent')?.value || 0);
+        const negTestPct = Number(document.getElementById('rand-test-percent')?.value || 0);
+
+        const posTrain = Math.round((posTotal * posTrainPct) / 100);
+        const posVal = Math.round((posTotal * posValPct) / 100);
+        const posTest = posTotal - posTrain - posVal;
+
+        const negTrain = Math.round((negTotal * negTrainPct) / 100);
+        const negVal = Math.round((negTotal * negValPct) / 100);
+        const negTest = negTotal - negTrain - negVal;
+
+        const totalTrain = posTrain + negTrain;
+        const totalVal = posVal + negVal;
+        const totalTest = posTest + negTest;
+
+        updateDatasetGraphs({
+            posTotal, negTotal, totalAll,
+            posTrain, posVal, posTest,
+            negTrain, negVal, negTest,
+            totalTrain, totalVal, totalTest
+        }, { skipProportion: true });
     }
 
     /**
@@ -550,6 +786,7 @@
         // ensure we know whether the type is checked
         const typeCheckbox = document.querySelector(`tr[data-type] input[type="checkbox"][value="${type}"]`);
         const checkedByType = Boolean(typeCheckbox?.checked);
+        setModeButtonsState(detailRow, mode);
 
         if (mode === 'select') {
             // mark the type as selected so it contributes to the summary
@@ -573,42 +810,54 @@
                     const item = document.createElement('div');
                     item.className = 'line-item';
                     item.innerHTML = `
-                        <label style="display:block; font-weight:600">${lineName} <span style='font-weight:400; color:var(--text-muted); font-size:12px'>(até ${available})</span></label>
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <input type="checkbox" class="line-enabled" data-line="${lineName}" data-type="${type}" ${checkedByType ? 'checked' : ''} />
-                            <input type="number" data-line="${lineName}" data-type="${type}" class="input input-small line-count" value="${checkedByType ? Math.min(available, defaultCount) : 0}" min="0" max="${available}">
+                        <header>
+                            <span>${lineName}</span>
+                            <span class="line-max">${checkedByType ? Math.min(available, defaultCount) : 0} / ${available}</span>
+                        </header>
+                        <div style="display:flex;gap:8px;align-items:center; justify-content:space-between;">
+                            <input type="checkbox" class="line-enabled custom-checkbox" data-line="${lineName}" data-type="${type}" ${checkedByType ? 'checked' : ''} />
+                            <div class="modern-number-input" style="margin: 0;">
+                                <button type="button" onclick="window.UI.stepNumericInput(this, -1)">-</button>
+                                <input type="number" data-line="${lineName}" data-type="${type}" class="line-count" value="${checkedByType ? Math.min(available, defaultCount) : 0}" min="0" max="${available}" style="width: 54px;">
+                                <button type="button" onclick="window.UI.stepNumericInput(this, 1)">+</button>
+                            </div>
                         </div>
                     `;
                     selectGrid.appendChild(item);
                 });
                 // listeners
-                selectGrid.querySelectorAll('.line-count').forEach(inp => inp.addEventListener('input', updateNegativeSummary));
+                selectGrid.querySelectorAll('.line-count').forEach(inp => {
+                    inp.addEventListener('input', (e) => {
+                        updateLineCountDisplay(e.target);
+                        updateNegativeSummary();
+                    });
+                    updateLineCountDisplay(inp);
+                });
                 selectGrid.querySelectorAll('.line-enabled').forEach(cb => cb.addEventListener('change', updateNegativeSummary));
 
                 // make sure detail row visible and hide random panel
                 if (detailRow.classList.contains('hidden')) detailRow.classList.remove('hidden');
-                // update the opener button text so the UI reflects the visible state
                 const tr = document.querySelector(`tr[data-type="${type}"]`);
                 const btn = tr?.querySelector('button');
-                if (btn) btn.textContent = 'Ocultar';
-                // ensure the radio in the DOM is checked for this mode
-                const radio = detailRow.querySelector(`.mode-options-group input[type=radio][value="select"]`);
-                if (radio) try { radio.checked = true; } catch (e) { /* ignore */ }
+                if (btn) {
+                    btn.classList.add('open');
+                    btn.setAttribute('aria-expanded', 'true');
+                }
                 if (randomPanel) randomPanel.style.display = 'none';
             }
         } else {
             // random mode -> hide grid, show random panel
             if (selectGrid) {
                 selectGrid.style.display = 'none';
-                // update opener button text to reflect panel visible state if detailRow is visible
-                const tr = document.querySelector(`tr[data-type="${type}"]`);
-                const btn = tr?.querySelector('button');
-                if (btn && !detailRow.classList.contains('hidden')) btn.textContent = 'Ocultar';
             }
             if (randomPanel) randomPanel.style.display = '';
-            // ensure radio state
-            const radioR = detailRow.querySelector(`.mode-options-group input[type=radio][value="random"]`);
-            if (radioR) try { radioR.checked = true; } catch (e) { /* ignore */ }
+            const tr = document.querySelector(`tr[data-type="${type}"]`);
+            const btn = tr?.querySelector('button');
+            if (btn) btn.classList.remove('btn-primary');
+            if (btn) {
+                btn.classList.toggle('open', !detailRow.classList.contains('hidden'));
+                btn.setAttribute('aria-expanded', (!detailRow.classList.contains('hidden')).toString());
+            }
         }
         updateNegativeSummary();
     }
@@ -1227,6 +1476,9 @@
 
     function bindPageHandlers(page) {
         if (page === 'treinamento') {
+            // Limpa todos os gráficos anteriores ao entrar na página
+            destroyAllCharts();
+
             // --- Configuração YOLO ---
             const currentCfg = ConfigManager.loadConfig();
             ConfigManager.renderConfigPreview(currentCfg);
@@ -1684,19 +1936,20 @@
                             };
                             closeBtn.addEventListener('click', closeBtn._closeListener);
                         }
-                        // também garante que os radios dentro do painel atualizem a UI ao trocar de modo
-                        const radios = detailRow.querySelectorAll('.mode-options-group input[type="radio"]');
-                        radios.forEach(r => {
-                            r.removeEventListener('change', r._modeListener);
-                            r._modeListener = (ev) => {
-                                const chosen = ev.target.value;
+                        // também garante que os botões do modo atualizem a UI ao trocar de modo
+                        const modeBtns = detailRow.querySelectorAll('.mode-options-group .segment');
+                        modeBtns.forEach(btn => {
+                            btn.removeEventListener('click', btn._modeListener);
+                            btn._modeListener = (ev) => {
+                                ev.preventDefault();
+                                const chosen = ev.currentTarget.dataset.mode || 'random';
                                 if (global.UI && typeof global.UI.setNegativeSelectionMode === 'function') {
                                     global.UI.setNegativeSelectionMode(typeKey, chosen);
                                 } else {
                                     setNegativeSelectionMode(typeKey, chosen);
                                 }
                             };
-                            r.addEventListener('change', r._modeListener);
+                            btn.addEventListener('click', btn._modeListener);
                         });
                     }
                 });
@@ -2055,12 +2308,58 @@
             document.getElementById('img-modal-backdrop')?.addEventListener('click', closeImageModal);
         },
         bindPageHandlers,
+        destroyAllCharts,
         toggleLineSelection: global.toggleLineSelection,
         setNegativeSelectionMode,
         collectTrainingPayload,
         openImageModal,
         updateNegativeSummary,
         updateDatasetGraphs,
+        updateSplitDistribution,
+        handleTypeCheckboxChange,
+        stepNumericInput,
     };
+
+    // Função Global para o sistema de Abas (Tabs)
+    // Sempre disponível pois ui.js é carregado no início e nunca removido
+    // Registrada de forma dupla para garantir disponibilidade máxima
+    global.switchTab = window.switchTab = function (element, tabName) {
+        console.log('[TABS] Ativando aba:', tabName);
+
+        const container = element ? element.closest('.tabs-container') : null;
+        if (!container) {
+            console.warn('[TABS] Container não encontrado');
+            return;
+        }
+
+        // 1. Limpa estado dos botões
+        container.querySelectorAll('.tab-trigger').forEach(btn => {
+            btn.classList.remove('active');
+            btn.style.color = '#64748B';
+            btn.style.borderBottomColor = 'transparent';
+        });
+
+        // 2. Ativa o botão atual
+        element.classList.add('active');
+        element.style.color = '#551BB3';
+        element.style.borderBottomColor = '#551BB3';
+
+        // 3. Gerencia o conteúdo
+        container.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.style.display = 'none';
+            pane.classList.remove('active');
+        });
+
+        const targetPane = document.getElementById('tab-' + tabName);
+        if (targetPane) {
+            targetPane.style.display = 'block';
+            targetPane.classList.add('active');
+            console.log('[TABS] ✓ Aba ativada com sucesso:', tabName);
+        } else {
+            console.warn('[TABS] Painel não encontrado:', 'tab-' + tabName);
+        }
+    };
+
+    console.log('[UI] Função global switchTab registrada');
 
 })(window);
